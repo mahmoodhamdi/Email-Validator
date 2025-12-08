@@ -27,6 +27,52 @@ A production-ready Email Validator web application built with Next.js 14, TypeSc
 - `POST /api/validate-bulk` - Validate multiple emails
 - `GET /api/health` - API health check
 
+## Screenshots
+
+### Home Page - Single Email Validation
+![Home Page - Light Mode](screenshots/01-home-light-empty.png)
+*Clean interface for single email validation*
+
+### Dark Mode Support
+![Home Page - Dark Mode](screenshots/02-home-dark-empty.png)
+*Full dark mode support for comfortable viewing*
+
+### Valid Email Validation
+![Valid Email](screenshots/03-home-valid-email.png)
+*Detailed validation results for valid emails*
+
+### Invalid Email Detection
+![Invalid Email](screenshots/04-home-invalid-syntax.png)
+*Clear feedback for syntax errors*
+
+### Disposable Email Detection
+![Disposable Email](screenshots/05-home-disposable-email.png)
+*Detection of temporary/disposable email addresses*
+
+### Role-Based Email Detection
+![Role-Based Email](screenshots/06-home-role-based-email.png)
+*Identification of role-based email addresses*
+
+### Typo Suggestions
+![Typo Suggestion](screenshots/07-home-typo-suggestion.png)
+*Smart suggestions for common email typos*
+
+### Bulk Validation
+![Bulk Validation](screenshots/08-bulk-empty.png)
+*Validate multiple emails at once*
+
+### Bulk Validation Results
+![Bulk Results](screenshots/10-bulk-results.png)
+*Comprehensive results for bulk validation*
+
+### Validation History
+![History Page](screenshots/11-history-page.png)
+*Track your validation history*
+
+### API Documentation
+![API Docs](screenshots/12-api-docs.png)
+*Built-in API documentation*
+
 ## Tech Stack
 
 - **Framework**: Next.js 14 (App Router)
@@ -38,6 +84,7 @@ A production-ready Email Validator web application built with Next.js 14, TypeSc
 - **Validation**: Zod
 - **Forms**: React Hook Form
 - **Icons**: Lucide React
+- **Testing**: Jest, React Testing Library, Playwright
 
 ## Getting Started
 
@@ -72,6 +119,86 @@ npm run dev
 npm run build
 npm start
 ```
+
+## Testing
+
+This project includes comprehensive tests:
+
+### Unit Tests
+Unit tests cover all validators, hooks, and stores.
+
+```bash
+# Run all unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Integration Tests
+Integration tests verify API routes work correctly.
+
+```bash
+# Integration tests are included in the main test suite
+npm test
+```
+
+### E2E Tests
+End-to-end tests using Playwright verify the complete user experience.
+
+```bash
+# Install Playwright browsers (first time only)
+npx playwright install
+
+# Run E2E tests
+npm run test:e2e
+
+# Run E2E tests with UI
+npm run test:e2e:ui
+```
+
+### Test Structure
+
+```
+src/
+├── __tests__/
+│   ├── validators/           # Unit tests for validators
+│   │   ├── index.test.ts
+│   │   ├── syntax.test.ts
+│   │   ├── disposable.test.ts
+│   │   ├── role-based.test.ts
+│   │   ├── free-provider.test.ts
+│   │   └── typo.test.ts
+│   ├── hooks/               # Unit tests for hooks
+│   │   ├── useDebounce.test.ts
+│   │   └── useLocalStorage.test.ts
+│   ├── stores/              # Unit tests for stores
+│   │   ├── history-store.test.ts
+│   │   └── validation-store.test.ts
+│   └── api/                 # Integration tests for API
+│       ├── validate.test.ts
+│       └── validate-bulk.test.ts
+└── e2e/                     # E2E tests
+    ├── home.spec.ts
+    ├── bulk.spec.ts
+    ├── history.spec.ts
+    ├── api-docs.spec.ts
+    ├── validation-cases.spec.ts
+    └── dark-mode.spec.ts
+```
+
+### Test Coverage
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Validators | 196 | Passing |
+| Hooks | Included | Passing |
+| Stores | Included | Passing |
+| API Routes | Included | Passing |
+| E2E | 15+ scenarios | Passing |
 
 ## API Usage
 
