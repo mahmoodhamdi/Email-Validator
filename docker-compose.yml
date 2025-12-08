@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: mahmoodhamdi/email-validator:latest
+    image: mwmsoftware/email-validator:latest
     container_name: email-validator
     ports:
       - "3000:3000"
