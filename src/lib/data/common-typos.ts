@@ -137,10 +137,34 @@ export const commonTypos: Record<string, string> = {
   '.ogr': '.org',
 };
 
+// Known correct domains that should not trigger typo detection
+const correctDomains = new Set([
+  'gmail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'icloud.com',
+  'aol.com',
+  'protonmail.com',
+  'live.com',
+  'ymail.com',
+  'googlemail.com',
+  'msn.com',
+  'me.com',
+  'mac.com',
+  'proton.me',
+  'pm.me',
+]);
+
 export function getSuggestion(domain: string): string | null {
   const lowerDomain = domain.toLowerCase();
 
-  // Direct match
+  // Don't suggest anything for correct domains
+  if (correctDomains.has(lowerDomain)) {
+    return null;
+  }
+
+  // Direct match in typo list
   if (commonTypos[lowerDomain]) {
     return commonTypos[lowerDomain];
   }
@@ -152,8 +176,8 @@ export function getSuggestion(domain: string): string | null {
     }
   }
 
-  // Levenshtein distance check for common domains
-  const commonDomains = [
+  // Levenshtein distance check for common domains (only if not a correct domain)
+  const suggestDomains = [
     'gmail.com',
     'yahoo.com',
     'hotmail.com',
@@ -161,13 +185,12 @@ export function getSuggestion(domain: string): string | null {
     'icloud.com',
     'aol.com',
     'protonmail.com',
-    'live.com',
-    'ymail.com',
   ];
 
-  for (const correctDomain of commonDomains) {
+  for (const correctDomain of suggestDomains) {
     const distance = levenshteinDistance(lowerDomain, correctDomain);
-    if (distance > 0 && distance <= 2) {
+    // Only suggest if distance is 1 or 2, and the domain is clearly a typo
+    if (distance === 1 && lowerDomain.length >= 5) {
       return correctDomain;
     }
   }
