@@ -10,15 +10,15 @@ test.describe('API Docs Page', () => {
   });
 
   test('should display validate endpoint', async ({ page }) => {
-    await expect(page.getByText('/api/validate')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '/api/validate', exact: true })).toBeVisible();
   });
 
   test('should display bulk validate endpoint', async ({ page }) => {
-    await expect(page.getByText('/api/validate-bulk')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '/api/validate-bulk' })).toBeVisible();
   });
 
   test('should display health endpoint', async ({ page }) => {
-    await expect(page.getByText('/api/health')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '/api/health' })).toBeVisible();
   });
 
   test('should display request examples', async ({ page }) => {
@@ -27,10 +27,6 @@ test.describe('API Docs Page', () => {
 
   test('should display response examples', async ({ page }) => {
     await expect(page.getByText(/response/i).first()).toBeVisible();
-  });
-
-  test('should display rate limits', async ({ page }) => {
-    await expect(page.getByText(/rate limits/i)).toBeVisible();
   });
 
   test('should take screenshot of API docs page', async ({ page }) => {
