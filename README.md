@@ -263,8 +263,27 @@ src/
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Author
 
-[mahmoodhamdi](https://github.com/mahmoodhamdi)
+**Mahmood Hamdi**
+
+- GitHub: [@mahmoodhamdi](https://github.com/mahmoodhamdi)
+- Email: mwm.softwars.solutions@gmail.com
+- Email: hmdy7486@gmail.com
+- Phone: +201019793768
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Support
+
+If you have any questions or need help, feel free to reach out via email or open an issue on GitHub.
