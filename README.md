@@ -120,6 +120,57 @@ npm run build
 npm start
 ```
 
+### Docker
+
+Run with Docker:
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/mahmoodhamdi/email-validator:latest
+
+# Run the container
+docker run -p 3000:3000 ghcr.io/mahmoodhamdi/email-validator:latest
+```
+
+Or use Docker Compose:
+
+```bash
+# Build and run
+docker-compose up -d
+
+# Stop
+docker-compose down
+```
+
+Build locally:
+
+```bash
+# Build the image
+docker build -t email-validator .
+
+# Run the container
+docker run -p 3000:3000 email-validator
+```
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **CI Pipeline**: Runs on every push and PR
+  - Linting and type checking
+  - Unit tests with coverage
+  - E2E tests with Playwright
+  - Build verification
+
+- **Docker Pipeline**: Runs on push to main
+  - Builds multi-architecture images (amd64, arm64)
+  - Pushes to GitHub Container Registry
+  - Pushes to Docker Hub (if configured)
+
+- **Release Pipeline**: Runs on version tags
+  - Creates GitHub releases
+  - Generates changelog
+
 ## Testing
 
 This project includes comprehensive tests:

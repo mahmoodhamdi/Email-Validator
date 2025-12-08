@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next.js
+.next
+out
+
+# Testing
+coverage
+.nyc_output
+playwright-report
+test-results
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Misc
+*.md
+!README.md
+.env*.local
+.env
+screenshots
+e2e
+src/__tests__
+jest.config.js
+jest.setup.js
+playwright.config.ts
