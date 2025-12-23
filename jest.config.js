@@ -15,13 +15,17 @@ const customJestConfig = {
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
     '!src/app/layout.tsx',
+    '!src/app/page.tsx',
+    '!src/app/**/page.tsx',
+    '!src/components/ui/**/*.tsx', // UI components are shadcn/ui
+    '!src/middleware.ts',
   ],
   coverageThreshold: {
     global: {
-      branches: 40,
-      functions: 40,
-      lines: 40,
-      statements: 40,
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
     },
   },
 };

@@ -1,3 +1,31 @@
+/**
+ * Email Validation Module
+ *
+ * This module provides comprehensive email validation by combining multiple checks:
+ * - Syntax: RFC 5322 compliance check
+ * - Domain: Format and DNS existence verification
+ * - MX Records: Mail server configuration check
+ * - Disposable: Temporary/throwaway email detection
+ * - Role-Based: Generic email detection (info@, support@, etc.)
+ * - Typo: Common domain misspelling detection
+ * - Free Provider: Gmail, Yahoo, etc. detection
+ * - Blacklist: Known spam source checking
+ * - Catch-All: Domains that accept all emails
+ *
+ * Scoring weights are configured in constants.ts and can be adjusted
+ * based on business requirements. The default weights prioritize:
+ * 1. MX records (25%) - Most critical for deliverability
+ * 2. Syntax + Domain (20% each) - Basic validity requirements
+ * 3. Disposable (15%) - Important for preventing abuse
+ * 4. Typo (10%) - Helps catch user mistakes
+ * 5. Role-based + Blacklist (5% each) - Quality indicators
+ *
+ * Limitations:
+ * - Cannot verify actual inbox existence without SMTP verification
+ * - Catch-all detection is heuristic-based
+ * - Blacklist data may not be real-time
+ * - IDN/punycode emails have limited support
+ */
 import type { ValidationResult, DeliverabilityStatus, RiskLevel } from '@/types/email';
 import { SCORE_WEIGHTS, SCORE_THRESHOLDS, BULK_CONFIG } from '@/lib/constants';
 import { resultCache } from '@/lib/cache';

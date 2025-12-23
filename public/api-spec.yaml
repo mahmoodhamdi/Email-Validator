@@ -1,0 +1,534 @@
+openapi: 3.0.3
+info:
+  title: Email Validator API
+  description: |
+    A comprehensive email validation API that checks email syntax, domain validity,
+    MX records, disposable email detection, role-based detection, typo suggestions,
+    blacklist checking, and catch-all domain detection.
+
+    ## Features
+    - **Syntax Validation**: RFC 5322 compliant email format validation
+    - **Domain Verification**: DNS-based domain existence check
+    - **MX Record Lookup**: Verify mail server configuration
+    - **Disposable Email Detection**: Identify temporary/throwaway emails
+    - **Role-Based Detection**: Detect generic emails like info@, support@
+    - **Typo Detection**: Suggest corrections for common domain typos
+    - **Blacklist Checking**: Check against known spam blacklists
+    - **Catch-All Detection**: Identify domains that accept all emails
+
+    ## Rate Limits
+    - Single validation: 100 requests per minute
+    - Bulk validation: 10 requests per minute
+    - Maximum emails per bulk request: 1000
+  version: 1.0.0
+  contact:
+    email: hmdy7486@gmail.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: /api
+    description: API endpoints
+
+paths:
+  /validate:
+    post:
+      summary: Validate a single email address
+      description: |
+        Performs comprehensive validation on a single email address including
+        syntax check, domain verification, MX record lookup, and various
+        quality checks.
+      operationId: validateEmail
+      tags:
+        - Validation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SingleEmailRequest'
+            examples:
+              valid:
+                summary: Valid email
+                value:
+                  email: user@gmail.com
+              invalid:
+                summary: Invalid email
+                value:
+                  email: invalid-email
+      responses:
+        '200':
+          description: Validation successful
+          headers:
+            X-RateLimit-Limit:
+              description: Maximum requests per window
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Remaining requests in current window
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Timestamp when the rate limit resets
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidJson:
+                  summary: Invalid JSON
+                  value:
+                    error: Invalid JSON in request body
+                    code: PARSE_ERROR
+                invalidEmail:
+                  summary: Invalid email format
+                  value:
+                    error: Email cannot be empty
+                    code: EMPTY_EMAIL
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: Get API usage information
+      description: Returns basic information about how to use the validation endpoint.
+      operationId: getValidateInfo
+      tags:
+        - Validation
+      responses:
+        '200':
+          description: API usage information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email Validation API
+                  usage:
+                    type: string
+                    example: 'POST /api/validate with { "email": "test@example.com" }'
+
+  /validate-bulk:
+    post:
+      summary: Validate multiple email addresses
+      description: |
+        Validates multiple email addresses in a single request. Emails are processed
+        in batches for optimal performance. Duplicate and invalid entries are
+        automatically filtered.
+      operationId: validateEmailBulk
+      tags:
+        - Bulk Validation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkEmailRequest'
+            examples:
+              multipleEmails:
+                summary: Multiple emails
+                value:
+                  emails:
+                    - user1@gmail.com
+                    - user2@yahoo.com
+                    - invalid@fake-domain.xyz
+      responses:
+        '200':
+          description: Bulk validation successful
+          headers:
+            X-RateLimit-Limit:
+              description: Maximum requests per window
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Remaining requests in current window
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Timestamp when the rate limit resets
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkValidationResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: Get bulk API usage information
+      description: Returns information about bulk validation endpoint usage and limits.
+      operationId: getBulkValidateInfo
+      tags:
+        - Bulk Validation
+      responses:
+        '200':
+          description: Bulk API usage information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Bulk Email Validation API
+                  usage:
+                    type: string
+                    example: 'POST /api/validate-bulk with { "emails": ["email1@example.com", "email2@example.com"] }'
+                  maxEmails:
+                    type: integer
+                    example: 1000
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the current health status of the API.
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    SingleEmailRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: The email address to validate
+          example: user@example.com
+          maxLength: 254
+
+    BulkEmailRequest:
+      type: object
+      required:
+        - emails
+      properties:
+        emails:
+          type: array
+          items:
+            type: string
+            format: email
+          description: Array of email addresses to validate
+          minItems: 1
+          maxItems: 1000
+          example:
+            - user1@example.com
+            - user2@example.com
+
+    ValidationResult:
+      type: object
+      required:
+        - email
+        - isValid
+        - score
+        - checks
+        - deliverability
+        - risk
+        - timestamp
+      properties:
+        email:
+          type: string
+          description: The validated email address
+          example: user@gmail.com
+        isValid:
+          type: boolean
+          description: Overall validity status
+          example: true
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Quality score (0-100)
+          example: 85
+        checks:
+          $ref: '#/components/schemas/ValidationChecks'
+        deliverability:
+          type: string
+          enum: [deliverable, risky, undeliverable, unknown]
+          description: Email deliverability status
+          example: deliverable
+        risk:
+          type: string
+          enum: [low, medium, high]
+          description: Risk level assessment
+          example: low
+        timestamp:
+          type: string
+          format: date-time
+          description: Validation timestamp
+          example: '2024-01-15T10:30:00Z'
+
+    ValidationChecks:
+      type: object
+      properties:
+        syntax:
+          $ref: '#/components/schemas/SyntaxCheck'
+        domain:
+          $ref: '#/components/schemas/DomainCheck'
+        mx:
+          $ref: '#/components/schemas/MxCheck'
+        disposable:
+          $ref: '#/components/schemas/DisposableCheck'
+        roleBased:
+          $ref: '#/components/schemas/RoleBasedCheck'
+        freeProvider:
+          $ref: '#/components/schemas/FreeProviderCheck'
+        typo:
+          $ref: '#/components/schemas/TypoCheck'
+        blacklisted:
+          $ref: '#/components/schemas/BlacklistCheck'
+        catchAll:
+          $ref: '#/components/schemas/CatchAllCheck'
+
+    SyntaxCheck:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Whether syntax is valid
+          example: true
+        message:
+          type: string
+          description: Validation message
+          example: Email syntax is valid
+
+    DomainCheck:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Whether domain format is valid
+          example: true
+        exists:
+          type: boolean
+          description: Whether domain exists
+          example: true
+        message:
+          type: string
+          description: Validation message
+          example: Domain format is valid
+
+    MxCheck:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Whether MX records exist
+          example: true
+        records:
+          type: array
+          items:
+            type: string
+          description: List of MX records
+          example:
+            - alt1.gmail-smtp-in.l.google.com
+            - alt2.gmail-smtp-in.l.google.com
+        message:
+          type: string
+          description: Validation message
+          example: MX records found
+
+    DisposableCheck:
+      type: object
+      properties:
+        isDisposable:
+          type: boolean
+          description: Whether email is from disposable provider
+          example: false
+        message:
+          type: string
+          description: Check message
+          example: Not a disposable email
+
+    RoleBasedCheck:
+      type: object
+      properties:
+        isRoleBased:
+          type: boolean
+          description: Whether email is role-based (info@, support@, etc.)
+          example: false
+        role:
+          type: string
+          nullable: true
+          description: Detected role if applicable
+          example: null
+
+    FreeProviderCheck:
+      type: object
+      properties:
+        isFree:
+          type: boolean
+          description: Whether email is from free provider
+          example: true
+        provider:
+          type: string
+          nullable: true
+          description: Provider name if free
+          example: Gmail
+
+    TypoCheck:
+      type: object
+      properties:
+        hasTypo:
+          type: boolean
+          description: Whether a typo was detected
+          example: false
+        suggestion:
+          type: string
+          nullable: true
+          description: Suggested correction
+          example: null
+
+    BlacklistCheck:
+      type: object
+      properties:
+        isBlacklisted:
+          type: boolean
+          description: Whether domain is blacklisted
+          example: false
+        lists:
+          type: array
+          items:
+            type: string
+          description: Blacklists where domain appears
+          example: []
+
+    CatchAllCheck:
+      type: object
+      properties:
+        isCatchAll:
+          type: boolean
+          description: Whether domain accepts all emails
+          example: false
+
+    BulkValidationResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationResult'
+          description: Array of validation results
+        metadata:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total emails processed
+              example: 10
+            duplicatesRemoved:
+              type: integer
+              description: Number of duplicates removed
+              example: 2
+            invalidRemoved:
+              type: integer
+              description: Number of invalid entries removed
+              example: 1
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Invalid request
+        code:
+          type: string
+          description: Error code
+          example: INVALID_REQUEST
+
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Rate limit exceeded
+        code:
+          type: string
+          description: Error code
+          example: RATE_LIMIT_EXCEEDED
+        retryAfter:
+          type: integer
+          description: Seconds until rate limit resets
+          example: 60
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        version:
+          type: string
+          example: '1.0.0'
+        timestamp:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
+        endpoints:
+          type: object
+          properties:
+            validate:
+              type: string
+              example: POST /api/validate
+            validateBulk:
+              type: string
+              example: POST /api/validate-bulk
+            health:
+              type: string
+              example: GET /api/health
+
+tags:
+  - name: Validation
+    description: Single email validation endpoints
+  - name: Bulk Validation
+    description: Bulk email validation endpoints
+  - name: System
+    description: System and health endpoints
