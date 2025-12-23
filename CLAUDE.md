@@ -1,0 +1,88 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build & Development Commands
+
+```bash
+npm run dev          # Start development server (port 3000)
+npm run build        # Production build
+npm run lint         # Run ESLint
+npx tsc --noEmit     # Type check without emitting
+```
+
+## Testing Commands
+
+```bash
+npm test                      # Run unit tests (Jest)
+npm test -- --watch           # Watch mode
+npm test -- --coverage        # With coverage report
+npm test -- path/to/file      # Run single test file
+
+npm run test:e2e              # Run E2E tests (Playwright, requires build)
+npm run test:e2e:ui           # E2E with interactive UI
+npm run test:all              # Run both unit and E2E tests
+```
+
+Unit tests are in `src/__tests__/` mirroring the source structure. E2E tests are in `e2e/`.
+
+## Architecture Overview
+
+### Validation Pipeline
+
+The core validation logic is in `src/lib/validators/`. The main orchestrator `index.ts` runs a multi-step validation pipeline:
+
+1. **Syntax validation** (`syntax.ts`) - RFC 5322 regex, parses local part and domain
+2. **Domain validation** (`domain.ts`) - Checks domain exists via DNS
+3. **MX validation** (`mx.ts`) - MX record lookup for mail servers
+4. **Disposable detection** (`disposable.ts`) - Checks against 500+ temp email domains
+5. **Role-based detection** (`role-based.ts`) - Detects prefixes like admin@, support@
+6. **Typo suggestion** (`typo.ts`) - Maps common typos (gmial.com → gmail.com)
+7. **Free provider detection** (`free-provider.ts`) - Identifies Gmail, Yahoo, etc.
+
+Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level.
+
+### Data Files
+
+Static validation data is in `src/lib/data/`:
+- `disposable-domains.ts` - Blocklist of temporary email domains
+- `free-providers.ts` - List of free email providers
+- `role-emails.ts` - Role-based email prefixes
+- `common-typos.ts` - Domain typo mappings
+
+### State Management
+
+Uses Zustand for state:
+- `src/stores/validation-store.ts` - Current validation state
+- `src/stores/history-store.ts` - Validation history (persisted to localStorage)
+
+### API Routes
+
+- `POST /api/validate` - Single email validation
+- `POST /api/validate-bulk` - Batch validation (array of emails)
+- `GET /api/health` - Health check endpoint
+
+### Pages
+
+- `/` - Single email validation with real-time results
+- `/bulk` - Bulk validation with CSV/TXT upload and export
+- `/history` - Validation history from localStorage
+- `/api-docs` - API documentation
+
+### UI Components
+
+- `src/components/ui/` - Shadcn/Radix-based primitives (button, input, card, etc.)
+- `src/components/layout/` - Header, Footer, ThemeToggle
+- `src/components/email/` - Domain-specific: EmailValidator, BulkValidator, ValidationResult, ScoreIndicator, ValidationHistory
+
+### Key Types
+
+All validation types are in `src/types/email.ts`:
+- `ValidationResult` - Complete validation response
+- `ValidationChecks` - All individual check results
+- `DeliverabilityStatus` - deliverable | risky | undeliverable | unknown
+- `RiskLevel` - low | medium | high
+
+## Path Alias
+
+Use `@/` to import from `src/`. Example: `import { validateEmail } from '@/lib/validators'`
