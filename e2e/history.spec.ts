@@ -6,7 +6,7 @@ test.describe('History Page', () => {
   });
 
   test('should display history heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /validation history/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /validation history/i }).first()).toBeVisible();
   });
 
   test('should show empty state when no history', async ({ page }) => {
@@ -27,14 +27,14 @@ test.describe('History Page', () => {
     const validateButton = page.getByRole('button', { name: /validate email/i });
     await validateButton.click();
 
-    // Wait for validation to complete
-    await page.waitForSelector('[class*="badge"]', { timeout: 10000 });
+    // Wait for validation to complete - look for result heading
+    await expect(page.getByRole('heading', { name: /syntax/i })).toBeVisible({ timeout: 10000 });
 
     // Navigate to history
     await page.goto('/history');
 
     // Should see the validated email
-    await expect(page.getByText('historytest@gmail.com')).toBeVisible();
+    await expect(page.getByText('historytest@gmail.com')).toBeVisible({ timeout: 5000 });
   });
 
   test('should take screenshot of history page', async ({ page }) => {
@@ -50,12 +50,12 @@ test.describe('History Page', () => {
     // Validate first email
     await emailInput.fill('test1@gmail.com');
     await page.getByRole('button', { name: /validate email/i }).click();
-    await page.waitForSelector('[class*="badge"]', { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /syntax/i })).toBeVisible({ timeout: 10000 });
 
     // Validate second email
     await emailInput.fill('test2@yahoo.com');
     await page.getByRole('button', { name: /validate email/i }).click();
-    await page.waitForSelector('[class*="badge"]', { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /syntax/i })).toBeVisible({ timeout: 10000 });
 
     // Navigate to history
     await page.goto('/history');

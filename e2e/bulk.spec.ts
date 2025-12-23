@@ -6,7 +6,7 @@ test.describe('Bulk Validation Page', () => {
   });
 
   test('should display bulk validation heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /bulk email validation/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /bulk email validation/i }).first()).toBeVisible();
   });
 
   test('should have textarea for email input', async ({ page }) => {
@@ -70,8 +70,8 @@ test.describe('Bulk Validation Page', () => {
     const validateButton = page.getByRole('button', { name: /validate all/i });
     await validateButton.click();
 
-    // Wait for results
-    await page.waitForSelector('[class*="badge"]', { timeout: 15000 });
+    // Wait for results heading to appear
+    await expect(page.getByRole('heading', { name: /results/i })).toBeVisible({ timeout: 15000 });
 
     await page.screenshot({ path: 'screenshots/bulk-results.png', fullPage: true });
   });
