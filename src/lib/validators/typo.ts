@@ -19,7 +19,9 @@ export function validateTypo(domain: string): TypoCheck {
 
 export function suggestCorrection(email: string): string | null {
   const atIndex = email.lastIndexOf('@');
-  if (atIndex === -1) return null;
+  if (atIndex === -1) {
+    return null;
+  }
 
   const localPart = email.slice(0, atIndex);
   const domain = email.slice(atIndex + 1);

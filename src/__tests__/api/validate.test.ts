@@ -3,6 +3,7 @@
  */
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/validate/route';
+import { clearAllRateLimits } from '@/lib/rate-limiter';
 
 // Mock the validators
 jest.mock('@/lib/validators', () => ({
@@ -28,6 +29,11 @@ jest.mock('@/lib/validators', () => ({
 }));
 
 describe('POST /api/validate', () => {
+  beforeEach(() => {
+    // Clear rate limits before each test
+    clearAllRateLimits();
+  });
+
   test('should validate email successfully', async () => {
     const request = new NextRequest('http://localhost:3000/api/validate', {
       method: 'POST',
@@ -40,6 +46,19 @@ describe('POST /api/validate', () => {
     expect(response.status).toBe(200);
     expect(data.email).toBe('test@example.com');
     expect(data.isValid).toBe(true);
+  });
+
+  test('should include rate limit headers', async () => {
+    const request = new NextRequest('http://localhost:3000/api/validate', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'test@example.com' }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.headers.get('X-RateLimit-Limit')).toBeDefined();
+    expect(response.headers.get('X-RateLimit-Remaining')).toBeDefined();
+    expect(response.headers.get('X-RateLimit-Reset')).toBeDefined();
   });
 
   test('should reject request without email', async () => {
@@ -92,6 +111,33 @@ describe('POST /api/validate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(data.email).toBe('test@example.com');
+  });
+
+  test('should handle invalid JSON', async () => {
+    const request = new NextRequest('http://localhost:3000/api/validate', {
+      method: 'POST',
+      body: 'invalid json',
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON in request body');
+  });
+
+  test('should sanitize email input', async () => {
+    const request = new NextRequest('http://localhost:3000/api/validate', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'TEST@EXAMPLE.COM' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // Email should be lowercase after sanitization
     expect(data.email).toBe('test@example.com');
   });
 });

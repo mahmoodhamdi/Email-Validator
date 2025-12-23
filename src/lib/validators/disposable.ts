@@ -1,11 +1,11 @@
 import type { DisposableCheck } from '@/types/email';
-import { disposableDomains } from '@/lib/data/disposable-domains';
+import { isDisposableDomain, getDisposableDomains } from '@/lib/data/disposable-domains';
 
 export function validateDisposable(domain: string): DisposableCheck {
   const lowerDomain = domain.toLowerCase();
 
-  // Check direct match
-  if (disposableDomains.has(lowerDomain)) {
+  // Check direct match using lazy-loaded function
+  if (isDisposableDomain(lowerDomain)) {
     return {
       isDisposable: true,
       message: 'This is a known disposable email domain',
@@ -17,7 +17,7 @@ export function validateDisposable(domain: string): DisposableCheck {
   if (parts.length > 2) {
     // Check if the root domain is disposable
     const rootDomain = parts.slice(-2).join('.');
-    if (disposableDomains.has(rootDomain)) {
+    if (getDisposableDomains().has(rootDomain)) {
       return {
         isDisposable: true,
         message: 'This is a subdomain of a disposable email domain',

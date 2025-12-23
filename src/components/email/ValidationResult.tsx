@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Copy,
   Download,
+  Shield,
+  Inbox,
 } from "lucide-react";
 import type { ValidationResult as ValidationResultType } from "@/types/email";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScoreIndicator } from "./ScoreIndicator";
 import { cn, copyToClipboard, downloadFile } from "@/lib/utils";
+import { toast } from "@/hooks/useToast";
 
 interface ValidationResultProps {
   result: ValidationResultType;
@@ -28,7 +31,20 @@ interface ValidationResultProps {
 
 export function ValidationResult({ result }: ValidationResultProps) {
   const handleCopy = async () => {
-    await copyToClipboard(JSON.stringify(result, null, 2));
+    try {
+      await copyToClipboard(JSON.stringify(result, null, 2));
+      toast({
+        title: "Copied to clipboard",
+        description: "Validation result has been copied",
+        variant: "success",
+      });
+    } catch {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy to clipboard",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExport = () => {
@@ -37,6 +53,11 @@ export function ValidationResult({ result }: ValidationResultProps) {
       `email-validation-${result.email}.json`,
       "application/json"
     );
+    toast({
+      title: "Exported successfully",
+      description: `Saved as email-validation-${result.email}.json`,
+      variant: "success",
+    });
   };
 
   const checks = [
@@ -83,6 +104,24 @@ export function ValidationResult({ result }: ValidationResultProps) {
         ? `Provider: ${result.checks.freeProvider.provider}`
         : "Not a free provider",
       neutral: result.checks.freeProvider.isFree,
+    },
+    {
+      icon: Shield,
+      label: "Blacklist",
+      valid: !result.checks.blacklisted.isBlacklisted,
+      message: result.checks.blacklisted.isBlacklisted
+        ? `Listed on: ${result.checks.blacklisted.lists.slice(0, 2).join(", ")}`
+        : "Not blacklisted",
+      inverted: true,
+    },
+    {
+      icon: Inbox,
+      label: "Catch-All",
+      valid: true, // Catch-all is informational, not necessarily bad
+      message: result.checks.catchAll.isCatchAll
+        ? "Domain accepts all emails"
+        : "Not a catch-all domain",
+      neutral: result.checks.catchAll.isCatchAll,
     },
   ];
 

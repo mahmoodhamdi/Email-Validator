@@ -1,11 +1,6 @@
 import type { SyntaxCheck } from '@/types/email';
-import { MAX_EMAIL_LENGTH } from '@/lib/constants';
-
-// RFC 5322 compliant email regex
-const EMAIL_REGEX = /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$/i;
-
-// Simplified regex for common validation
-const SIMPLE_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { EMAIL_LIMITS } from '@/lib/constants';
+import { EMAIL_REGEX, SIMPLE_EMAIL_REGEX } from './patterns';
 
 export function validateSyntax(email: string): SyntaxCheck {
   // Trim whitespace
@@ -20,10 +15,10 @@ export function validateSyntax(email: string): SyntaxCheck {
   }
 
   // Check length
-  if (trimmedEmail.length > MAX_EMAIL_LENGTH) {
+  if (trimmedEmail.length > EMAIL_LIMITS.maxLength) {
     return {
       valid: false,
-      message: `Email exceeds maximum length of ${MAX_EMAIL_LENGTH} characters`,
+      message: `Email exceeds maximum length of ${EMAIL_LIMITS.maxLength} characters`,
     };
   }
 
@@ -48,10 +43,10 @@ export function validateSyntax(email: string): SyntaxCheck {
     };
   }
 
-  if (localPart.length > 64) {
+  if (localPart.length > EMAIL_LIMITS.maxLocalPartLength) {
     return {
       valid: false,
-      message: 'Local part exceeds maximum length of 64 characters',
+      message: `Local part exceeds maximum length of ${EMAIL_LIMITS.maxLocalPartLength} characters`,
     };
   }
 
@@ -63,10 +58,10 @@ export function validateSyntax(email: string): SyntaxCheck {
     };
   }
 
-  if (domainPart.length > 255) {
+  if (domainPart.length > EMAIL_LIMITS.maxDomainLength) {
     return {
       valid: false,
-      message: 'Domain exceeds maximum length of 255 characters',
+      message: `Domain exceeds maximum length of ${EMAIL_LIMITS.maxDomainLength} characters`,
     };
   }
 

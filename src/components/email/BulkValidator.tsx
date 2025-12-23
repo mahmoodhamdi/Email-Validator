@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ValidationResult } from "@/types/email";
 import { downloadFile } from "@/lib/utils";
 import { RATE_LIMITS } from "@/lib/constants";
+import { toast } from "@/hooks/useToast";
 
 export function BulkValidator() {
   const [emails, setEmails] = useState("");
@@ -44,7 +45,9 @@ export function BulkValidator() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -56,7 +59,9 @@ export function BulkValidator() {
 
   const handleValidate = useCallback(async () => {
     const emailList = parseEmails(emails);
-    if (emailList.length === 0) return;
+    if (emailList.length === 0) {
+      return;
+    }
 
     setIsLoading(true);
     setResults([]);
@@ -72,14 +77,29 @@ export function BulkValidator() {
       });
 
       if (!response.ok) {
-        throw new Error("Validation failed");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Validation failed");
       }
 
-      const validationResults: ValidationResult[] = await response.json();
+      const data = await response.json();
+      // Handle both old format (array) and new format (object with results)
+      const validationResults: ValidationResult[] = Array.isArray(data) ? data : data.results;
       setResults(validationResults);
       setProgress(100);
+
+      const validCount = validationResults.filter((r) => r.isValid).length;
+      toast({
+        title: "Validation complete",
+        description: `${validCount} of ${validationResults.length} emails are valid`,
+        variant: validCount === validationResults.length ? "success" : "default",
+      });
     } catch (error) {
       console.error("Bulk validation error:", error);
+      toast({
+        title: "Validation failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +115,8 @@ export function BulkValidator() {
       "Disposable",
       "Role-Based",
       "Free Provider",
+      "Blacklisted",
+      "Catch-All",
     ];
     const rows = results.map((r) => [
       r.email,
@@ -105,10 +127,17 @@ export function BulkValidator() {
       r.checks.disposable.isDisposable ? "Yes" : "No",
       r.checks.roleBased.isRoleBased ? "Yes" : "No",
       r.checks.freeProvider.isFree ? "Yes" : "No",
+      r.checks.blacklisted.isBlacklisted ? "Yes" : "No",
+      r.checks.catchAll.isCatchAll ? "Yes" : "No",
     ]);
 
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
     downloadFile(csv, "email-validation-results.csv", "text/csv");
+    toast({
+      title: "Exported to CSV",
+      description: `${results.length} results saved`,
+      variant: "success",
+    });
   };
 
   const handleExportJSON = () => {
@@ -117,6 +146,11 @@ export function BulkValidator() {
       "email-validation-results.json",
       "application/json"
     );
+    toast({
+      title: "Exported to JSON",
+      description: `${results.length} results saved`,
+      variant: "success",
+    });
   };
 
   const handleClear = () => {

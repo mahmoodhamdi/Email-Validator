@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 
+/**
+ * Custom hook for persisting state in localStorage.
+ * Provides read, write, and remove operations with automatic serialization.
+ *
+ * @template T - The type of the stored value
+ * @param key - The localStorage key
+ * @param initialValue - The initial value if no stored value exists
+ * @returns A tuple of [storedValue, setValue, removeValue]
+ *
+ * @example
+ * const [theme, setTheme, removeTheme] = useLocalStorage('theme', 'light');
+ */
 export function useLocalStorage<T>(
   key: string,
   initialValue: T

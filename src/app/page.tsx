@@ -1,4 +1,21 @@
-import { EmailValidator } from "@/components/email/EmailValidator";
+import { Suspense } from "react";
+import { EmailValidatorWrapper } from "@/components/email/EmailValidator";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function EmailValidatorFallback() {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="flex flex-col items-center gap-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-11 w-full" />
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -13,7 +30,9 @@ export default function Home() {
             syntax validation, domain verification, MX record lookup, and more.
           </p>
         </div>
-        <EmailValidator />
+        <Suspense fallback={<EmailValidatorFallback />}>
+          <EmailValidatorWrapper />
+        </Suspense>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FeatureCard
             title="Syntax Check"

@@ -21,14 +21,22 @@ export function ScoreIndicator({ score, size = "md" }: ScoreIndicatorProps) {
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
   const getColor = () => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 50) return "text-amber-500";
+    if (score >= 80) {
+      return "text-green-500";
+    }
+    if (score >= 50) {
+      return "text-amber-500";
+    }
     return "text-red-500";
   };
 
   const getStrokeColor = () => {
-    if (score >= 80) return "#22c55e";
-    if (score >= 50) return "#f59e0b";
+    if (score >= 80) {
+      return "#22c55e";
+    }
+    if (score >= 50) {
+      return "#f59e0b";
+    }
     return "#ef4444";
   };
 
