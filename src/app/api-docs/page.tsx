@@ -1,16 +1,28 @@
+import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RATE_LIMITS } from "@/lib/constants";
+import { SwaggerUIWrapper } from "@/components/SwaggerUI";
+import { FileJson, BookOpen } from "lucide-react";
 
 export const metadata = {
   title: "API Documentation - Email Validator",
-  description: "API documentation for the Email Validator service",
+  description: "Interactive API documentation for the Email Validator service with Swagger UI",
 };
+
+function SwaggerLoading() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  );
+}
 
 export default function ApiDocsPage() {
   return (
     <div className="container py-8 md:py-12">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-5xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
             API Documentation
@@ -20,30 +32,59 @@ export default function ApiDocsPage() {
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* Single Validation */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Badge>POST</Badge>
-                <CardTitle className="text-lg">/api/validate</CardTitle>
-              </div>
-              <CardDescription>
-                Validate a single email address
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-semibold mb-2">Request Body</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+        <Tabs defaultValue="interactive" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="interactive" className="flex items-center gap-2">
+              <FileJson className="h-4 w-4" />
+              Interactive (Swagger)
+            </TabsTrigger>
+            <TabsTrigger value="static" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Documentation
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="interactive" className="mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>Interactive API Explorer</CardTitle>
+                <CardDescription>
+                  Try out the API endpoints directly from this page. Click on an endpoint to expand it and use the &quot;Try it out&quot; button.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<SwaggerLoading />}>
+                  <SwaggerUIWrapper specUrl="/api-spec.yaml" />
+                </Suspense>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="static" className="mt-0">
+            <div className="space-y-6">
+              {/* Single Validation */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Badge>POST</Badge>
+                    <CardTitle className="text-lg">/api/validate</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Validate a single email address
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Request Body</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
 {`{
   "email": "test@example.com"
 }`}
-                </pre>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Response</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                    </pre>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Response</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
 {`{
   "email": "test@example.com",
   "isValid": true,
@@ -91,34 +132,34 @@ export default function ApiDocsPage() {
   },
   "timestamp": "2024-01-01T00:00:00.000Z"
 }`}
-                </pre>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Example (cURL)</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                    </pre>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Example (cURL)</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
 {`curl -X POST https://your-domain/api/validate \\
   -H "Content-Type: application/json" \\
   -d '{"email": "test@example.com"}'`}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Bulk Validation */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Badge>POST</Badge>
-                <CardTitle className="text-lg">/api/validate-bulk</CardTitle>
-              </div>
-              <CardDescription>
-                Validate multiple email addresses (max {RATE_LIMITS.maxBulkSize} per request)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-semibold mb-2">Request Body</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+              {/* Bulk Validation */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Badge>POST</Badge>
+                    <CardTitle className="text-lg">/api/validate-bulk</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Validate multiple email addresses (max {RATE_LIMITS.maxBulkSize} per request)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Request Body</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
 {`{
   "emails": [
     "test1@example.com",
@@ -126,59 +167,60 @@ export default function ApiDocsPage() {
     "test3@gmail.com"
   ]
 }`}
-                </pre>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Response</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-{`[
-  {
-    "email": "test1@example.com",
-    "isValid": true,
-    "score": 85,
-    ...
-  },
-  {
-    "email": "test2@example.com",
-    "isValid": true,
-    "score": 80,
-    ...
-  },
-  {
-    "email": "test3@gmail.com",
-    "isValid": true,
-    "score": 95,
-    ...
+                    </pre>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Response</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+{`{
+  "results": [
+    {
+      "email": "test1@example.com",
+      "isValid": true,
+      "score": 85,
+      ...
+    },
+    {
+      "email": "test2@example.com",
+      "isValid": true,
+      "score": 80,
+      ...
+    }
+  ],
+  "metadata": {
+    "total": 3,
+    "duplicatesRemoved": 0,
+    "invalidRemoved": 0
   }
-]`}
-                </pre>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Example (cURL)</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+}`}
+                    </pre>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Example (cURL)</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
 {`curl -X POST https://your-domain/api/validate-bulk \\
   -H "Content-Type: application/json" \\
   -d '{"emails": ["test1@example.com", "test2@gmail.com"]}'`}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Health Check */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">GET</Badge>
-                <CardTitle className="text-lg">/api/health</CardTitle>
-              </div>
-              <CardDescription>
-                Check API health status
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-semibold mb-2">Response</h4>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+              {/* Health Check */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">GET</Badge>
+                    <CardTitle className="text-lg">/api/health</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Check API health status
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Response</h4>
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
 {`{
   "status": "healthy",
   "version": "1.0.0",
@@ -189,68 +231,90 @@ export default function ApiDocsPage() {
     "health": "GET /api/health"
   }
 }`}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Response Fields */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Response Fields Explained</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">isValid</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Boolean indicating if the email passes all critical checks
-                    </p>
+              {/* Response Fields */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Response Fields Explained</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">isValid</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Boolean indicating if the email passes all critical checks
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">score</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Quality score from 0-100 based on all validation checks
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">deliverability</h4>
+                        <p className="text-sm text-muted-foreground">
+                          deliverable | risky | undeliverable | unknown
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">risk</h4>
+                        <p className="text-sm text-muted-foreground">
+                          low | medium | high - risk level assessment
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">score</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Quality score from 0-100 based on all validation checks
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">deliverability</h4>
-                    <p className="text-sm text-muted-foreground">
-                      deliverable | risky | undeliverable | unknown
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">risk</h4>
-                    <p className="text-sm text-muted-foreground">
-                      low | medium | high - risk level assessment
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Rate Limits */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Rate Limits</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p>
-                  <strong>Single Validation:</strong> {RATE_LIMITS.singleValidation.max} requests per minute
-                </p>
-                <p>
-                  <strong>Bulk Validation:</strong> {RATE_LIMITS.bulkValidation.max} requests per minute
-                </p>
-                <p>
-                  <strong>Max Bulk Size:</strong> {RATE_LIMITS.maxBulkSize} emails per request
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Rate Limits */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Rate Limits</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <p>
+                      <strong>Single Validation:</strong> {RATE_LIMITS.singleValidation.max} requests per minute
+                    </p>
+                    <p>
+                      <strong>Bulk Validation:</strong> {RATE_LIMITS.bulkValidation.max} requests per minute
+                    </p>
+                    <p>
+                      <strong>Max Bulk Size:</strong> {RATE_LIMITS.maxBulkSize} emails per request
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* OpenAPI Spec Download */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>OpenAPI Specification</CardTitle>
+                  <CardDescription>
+                    Download the OpenAPI 3.0 specification for code generation or import into tools like Postman
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <a
+                    href="/api-spec.yaml"
+                    download="email-validator-api.yaml"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    <FileJson className="h-4 w-4" />
+                    Download OpenAPI Spec (YAML)
+                  </a>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
