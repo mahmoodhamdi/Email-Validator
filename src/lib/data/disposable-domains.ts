@@ -1,4 +1,44 @@
-export const disposableDomains = new Set([
+/**
+ * Lazy-loaded Set of disposable email domains.
+ * The Set is created only when first accessed, reducing initial load time.
+ */
+
+// Private variable to hold the cached Set
+let _disposableDomains: Set<string> | null = null;
+
+/**
+ * Get the Set of disposable domains.
+ * Uses lazy loading - the Set is created on first access.
+ *
+ * @returns Set of disposable domain names
+ */
+export function getDisposableDomains(): Set<string> {
+  if (_disposableDomains === null) {
+    _disposableDomains = new Set(disposableDomainsList);
+  }
+  return _disposableDomains;
+}
+
+/**
+ * Check if a domain is in the disposable list.
+ *
+ * @param domain - The domain to check
+ * @returns true if the domain is disposable
+ */
+export function isDisposableDomain(domain: string): boolean {
+  return getDisposableDomains().has(domain.toLowerCase());
+}
+
+/**
+ * Clear the cached domains Set.
+ * Useful for testing or if the list needs to be reloaded.
+ */
+export function clearDisposableDomainsCache(): void {
+  _disposableDomains = null;
+}
+
+// Raw list of disposable domains
+const disposableDomainsList = [
   '0-mail.com',
   '0815.ru',
   '0clickemail.com',
@@ -1109,5 +1149,5 @@ export const disposableDomains = new Set([
   'zomg.info',
   'zxcv.com',
   'zxcvbnm.com',
-  'zzz.com'
-]);
+  'zzz.com',
+];

@@ -2,14 +2,32 @@ import { useState, useCallback } from 'react';
 import type { ValidationResult } from '@/types/email';
 import { useHistoryStore } from '@/stores/history-store';
 
+/**
+ * Return type for the useEmailValidator hook.
+ */
 interface UseEmailValidatorReturn {
+  /** The current validation result */
   result: ValidationResult | null;
+  /** Whether a validation is in progress */
   isLoading: boolean;
+  /** Error message if validation failed */
   error: string | null;
+  /** Function to validate an email address */
   validate: (email: string) => Promise<ValidationResult | null>;
+  /** Function to reset the hook state */
   reset: () => void;
 }
 
+/**
+ * Custom hook for email validation with built-in state management.
+ * Handles API calls, loading states, errors, and history integration.
+ *
+ * @returns Object containing validation state and control functions
+ *
+ * @example
+ * const { result, isLoading, error, validate, reset } = useEmailValidator();
+ * await validate('test@example.com');
+ */
 export function useEmailValidator(): UseEmailValidatorReturn {
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);

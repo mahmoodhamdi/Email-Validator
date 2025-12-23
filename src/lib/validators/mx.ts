@@ -1,4 +1,5 @@
 import type { MxCheck } from '@/types/email';
+import { mxCache } from '@/lib/cache';
 
 interface DnsApiResponse {
   Answer?: Array<{
@@ -8,7 +9,35 @@ interface DnsApiResponse {
   Status: number;
 }
 
+/**
+ * Validate MX records for a domain.
+ * Results are cached to reduce DNS lookups.
+ *
+ * @param domain - The domain to check MX records for
+ * @returns MxCheck result with validity, records, and message
+ */
 export async function validateMx(domain: string): Promise<MxCheck> {
+  const normalizedDomain = domain.toLowerCase();
+
+  // Check cache first
+  const cached = mxCache.get(normalizedDomain);
+  if (cached) {
+    return cached;
+  }
+
+  // Perform the actual validation
+  const result = await performMxLookup(normalizedDomain);
+
+  // Cache the result (both success and failure)
+  mxCache.set(normalizedDomain, result);
+
+  return result;
+}
+
+/**
+ * Perform the actual MX record lookup via Google's DNS-over-HTTPS API.
+ */
+async function performMxLookup(domain: string): Promise<MxCheck> {
   try {
     // Use Google's DNS-over-HTTPS API to check MX records
     const response = await fetch(

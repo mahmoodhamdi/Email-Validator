@@ -1,44 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateEmail } from '@/lib/validators';
-import { MAX_EMAIL_LENGTH } from '@/lib/constants';
+import {
+  checkSingleValidationLimit,
+  getClientIdentifier,
+  createRateLimitHeaders,
+} from '@/lib/rate-limiter';
+import { sanitizeEmail } from '@/lib/sanitize';
+import { parseSingleEmailRequest } from '@/lib/validation-schemas';
+import {
+  createErrorResponse,
+  handleError,
+  RateLimitError,
+  ParseError,
+  ValidationError,
+  HTTP_STATUS,
+} from '@/lib/errors';
 
+/**
+ * POST /api/validate
+ * Validate a single email address.
+ */
 export async function POST(request: NextRequest) {
+  let rateLimitHeaders: HeadersInit = {};
+
   try {
-    const body = await request.json();
-    const { email } = body;
+    // Get client identifier for rate limiting
+    const clientId = getClientIdentifier(request);
 
-    if (!email || typeof email !== 'string') {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
+    // Check rate limit
+    const rateLimitResult = checkSingleValidationLimit(clientId);
+    rateLimitHeaders = createRateLimitHeaders(rateLimitResult);
+
+    if (!rateLimitResult.allowed) {
+      throw new RateLimitError('Rate limit exceeded', rateLimitResult.retryAfter);
     }
 
-    const trimmedEmail = email.trim();
-
-    if (trimmedEmail.length === 0) {
-      return NextResponse.json(
-        { error: 'Email cannot be empty' },
-        { status: 400 }
-      );
+    // Parse request body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new ParseError('Invalid JSON in request body');
     }
 
-    if (trimmedEmail.length > MAX_EMAIL_LENGTH) {
-      return NextResponse.json(
-        { error: `Email exceeds maximum length of ${MAX_EMAIL_LENGTH} characters` },
-        { status: 400 }
-      );
+    // Validate request schema
+    const parseResult = parseSingleEmailRequest(body);
+    if (!parseResult.success) {
+      throw new ValidationError(parseResult.error, 'INVALID_REQUEST');
     }
 
-    const result = await validateEmail(trimmedEmail);
+    // Sanitize email
+    const sanitizedEmail = sanitizeEmail(parseResult.data.email);
 
-    return NextResponse.json(result);
+    if (!sanitizedEmail) {
+      throw new ValidationError('Email cannot be empty', 'EMPTY_EMAIL');
+    }
+
+    // Validate email
+    const result = await validateEmail(sanitizedEmail);
+
+    return NextResponse.json(result, { headers: rateLimitHeaders });
   } catch (error) {
-    console.error('Validation error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    if (error instanceof RateLimitError) {
+      return createErrorResponse(error, HTTP_STATUS.TOO_MANY_REQUESTS, rateLimitHeaders);
+    }
+    if (error instanceof ParseError || error instanceof ValidationError) {
+      return createErrorResponse(error, HTTP_STATUS.BAD_REQUEST, rateLimitHeaders);
+    }
+    return handleError(error, rateLimitHeaders);
   }
 }
 

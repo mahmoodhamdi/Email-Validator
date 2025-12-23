@@ -3,6 +3,7 @@
  */
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/validate-bulk/route';
+import { clearAllRateLimits } from '@/lib/rate-limiter';
 
 // Mock the validators module
 jest.mock('@/lib/validators', () => ({
@@ -32,6 +33,11 @@ jest.mock('@/lib/validators', () => ({
 }));
 
 describe('POST /api/validate-bulk', () => {
+  beforeEach(() => {
+    // Clear rate limits before each test
+    clearAllRateLimits();
+  });
+
   test('should validate multiple emails successfully', async () => {
     const emails = ['test1@example.com', 'test2@example.com', 'test3@example.com'];
     const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
@@ -43,8 +49,25 @@ describe('POST /api/validate-bulk', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(Array.isArray(data)).toBe(true);
-    expect(data.length).toBe(3);
+    // New response format includes results and metadata
+    expect(data.results).toBeDefined();
+    expect(Array.isArray(data.results)).toBe(true);
+    expect(data.results.length).toBe(3);
+    expect(data.metadata).toBeDefined();
+    expect(data.metadata.total).toBe(3);
+  });
+
+  test('should include rate limit headers', async () => {
+    const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
+      method: 'POST',
+      body: JSON.stringify({ emails: ['test@example.com'] }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.headers.get('X-RateLimit-Limit')).toBeDefined();
+    expect(response.headers.get('X-RateLimit-Remaining')).toBeDefined();
+    expect(response.headers.get('X-RateLimit-Reset')).toBeDefined();
   });
 
   test('should reject request without emails array', async () => {
@@ -87,8 +110,8 @@ describe('POST /api/validate-bulk', () => {
     expect(data.error).toContain('Maximum');
   });
 
-  test('should deduplicate emails', async () => {
-    const emails = ['test@example.com', 'test@example.com', 'test@example.com'];
+  test('should deduplicate emails and report in metadata', async () => {
+    const emails = ['test@example.com', 'TEST@EXAMPLE.COM', 'test@example.com'];
     const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
       method: 'POST',
       body: JSON.stringify({ emails }),
@@ -98,7 +121,41 @@ describe('POST /api/validate-bulk', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.length).toBe(1);
+    expect(data.results.length).toBe(1);
+    expect(data.metadata.duplicatesRemoved).toBe(2);
+  });
+
+  test('should handle invalid JSON', async () => {
+    const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
+      method: 'POST',
+      body: 'invalid json',
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON in request body');
+  });
+
+  test('should sanitize and filter invalid emails', async () => {
+    const emails = [
+      'valid@example.com',
+      'notanemail', // No @
+      '', // Empty
+      '   ', // Whitespace only
+    ];
+    const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
+      method: 'POST',
+      body: JSON.stringify({ emails }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.results.length).toBe(1);
+    expect(data.metadata.invalidRemoved).toBeGreaterThan(0);
   });
 });
 

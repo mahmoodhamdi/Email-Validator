@@ -1,17 +1,23 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Loader2, Search } from "lucide-react";
+import { Mail, Loader2, Search, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ValidationResult } from "./ValidationResult";
-import type { ValidationResult as ValidationResultType } from "@/types/email";
+import { ValidationResultSkeleton } from "./ValidationResultSkeleton";
 import { useHistoryStore } from "@/stores/history-store";
+import { useValidationStore } from "@/stores/validation-store";
+import { useDebounce } from "@/hooks/useDebounce";
+import { DEBOUNCE_DELAYS } from "@/lib/constants";
 
 const emailSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -19,9 +25,33 @@ const emailSchema = z.object({
 
 type EmailFormData = z.infer<typeof emailSchema>;
 
-export function EmailValidator() {
-  const [result, setResult] = useState<ValidationResultType | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+interface EmailValidatorProps {
+  initialEmail?: string;
+}
+
+/**
+ * Wrapper component that reads search params and passes to EmailValidator.
+ * Uses useSearchParams which requires Suspense boundary.
+ */
+export function EmailValidatorWrapper() {
+  const searchParams = useSearchParams();
+  const initialEmail = searchParams.get("email") || undefined;
+
+  return <EmailValidator initialEmail={initialEmail} />;
+}
+
+export function EmailValidator({ initialEmail }: EmailValidatorProps) {
+  const [realTimeEnabled, setRealTimeEnabled] = useState(false);
+
+  // Use validation store for state management
+  const {
+    currentResult: result,
+    isValidating: isLoading,
+    setResult,
+    setIsValidating: setIsLoading,
+    setEmail: setStoreEmail,
+  } = useValidationStore();
+
   const addToHistory = useHistoryStore((state) => state.addItem);
 
   const {
@@ -29,14 +59,25 @@ export function EmailValidator() {
     handleSubmit,
     formState: { errors },
     watch,
+    setValue,
   } = useForm<EmailFormData>({
     resolver: zodResolver(emailSchema),
+    defaultValues: {
+      email: initialEmail || "",
+    },
   });
 
   const emailValue = watch("email");
+  const debouncedEmail = useDebounce(emailValue, DEBOUNCE_DELAYS.submit);
 
-  const onSubmit = useCallback(
-    async (data: EmailFormData) => {
+  // Validate email function
+  const validateEmail = useCallback(
+    async (email: string) => {
+      if (!email) {
+        return;
+      }
+
+      setStoreEmail(email);
       setIsLoading(true);
       setResult(null);
 
@@ -46,14 +87,14 @@ export function EmailValidator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email: data.email }),
+          body: JSON.stringify({ email }),
         });
 
         if (!response.ok) {
           throw new Error("Validation failed");
         }
 
-        const validationResult: ValidationResultType = await response.json();
+        const validationResult = await response.json();
         setResult(validationResult);
         addToHistory(validationResult);
       } catch (error) {
@@ -62,8 +103,39 @@ export function EmailValidator() {
         setIsLoading(false);
       }
     },
-    [addToHistory]
+    [addToHistory, setIsLoading, setResult, setStoreEmail]
   );
+
+  // Handle form submit
+  const onSubmit = useCallback(
+    async (data: EmailFormData) => {
+      await validateEmail(data.email);
+    },
+    [validateEmail]
+  );
+
+  // Auto-validate when initial email is provided (from history revalidate)
+  useEffect(() => {
+    if (initialEmail) {
+      setValue("email", initialEmail);
+      // Trigger validation after a short delay to let the form settle
+      const timer = setTimeout(() => {
+        validateEmail(initialEmail);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialEmail, setValue, validateEmail]);
+
+  // Real-time validation effect
+  useEffect(() => {
+    if (realTimeEnabled && debouncedEmail) {
+      // Check if the email looks valid before making the API call
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(debouncedEmail)) {
+        validateEmail(debouncedEmail);
+      }
+    }
+  }, [realTimeEnabled, debouncedEmail, validateEmail]);
 
   return (
     <div className="space-y-6">
@@ -98,6 +170,21 @@ export function EmailValidator() {
             {errors.email && (
               <p className="text-sm text-destructive">{errors.email.message}</p>
             )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="real-time"
+                  checked={realTimeEnabled}
+                  onCheckedChange={setRealTimeEnabled}
+                />
+                <Label htmlFor="real-time" className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <Zap className="h-4 w-4" />
+                  Real-time validation
+                </Label>
+              </div>
+            </div>
+
             <Button
               type="submit"
               className="w-full h-11"
@@ -120,7 +207,18 @@ export function EmailValidator() {
       </Card>
 
       <AnimatePresence mode="wait">
-        {result && (
+        {isLoading && !result && (
+          <motion.div
+            key="skeleton"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <ValidationResultSkeleton />
+          </motion.div>
+        )}
+        {result && !isLoading && (
           <motion.div
             key={result.timestamp}
             initial={{ opacity: 0, y: 20 }}
