@@ -1,0 +1,808 @@
+{
+  "info": {
+    "name": "Email Validator API",
+    "description": "Complete API collection for the Email Validator service.\n\n## Features\n- Single email validation\n- Bulk email validation\n- Health checks\n\n## Authentication\nSet the `api_key` environment variable to use API key authentication.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Validation",
+      "description": "Email validation endpoints",
+      "item": [
+        {
+          "name": "Validate Single Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@gmail.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Validate a single email address.\n\n**Response Fields:**\n- `email`: The validated email\n- `isValid`: Boolean validation result\n- `score`: Quality score (0-100)\n- `deliverability`: deliverable | risky | undeliverable | unknown\n- `risk`: low | medium | high\n- `checks`: Detailed validation checks"
+          },
+          "response": [
+            {
+              "name": "Valid Email",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"test@gmail.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/validate",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "validate"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"email\": \"test@gmail.com\",\n  \"isValid\": true,\n  \"score\": 100,\n  \"deliverability\": \"deliverable\",\n  \"risk\": \"low\",\n  \"checks\": {\n    \"syntax\": {\"valid\": true, \"message\": \"Email syntax is valid\"},\n    \"domain\": {\"valid\": true, \"exists\": true, \"message\": \"Domain exists\"},\n    \"mx\": {\"valid\": true, \"records\": [\"gmail-smtp-in.l.google.com\"], \"message\": \"Found 5 MX record(s)\"},\n    \"disposable\": {\"isDisposable\": false, \"message\": \"Not a disposable email domain\"},\n    \"roleBased\": {\"isRoleBased\": false, \"role\": null},\n    \"freeProvider\": {\"isFree\": true, \"provider\": \"Gmail\"},\n    \"typo\": {\"hasTypo\": false, \"suggestion\": null}\n  },\n  \"timestamp\": \"2025-01-15T10:00:00.000Z\"\n}"
+            },
+            {
+              "name": "Invalid Email",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"invalid-email\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/validate",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "validate"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"email\": \"invalid-email\",\n  \"isValid\": false,\n  \"score\": 0,\n  \"deliverability\": \"undeliverable\",\n  \"risk\": \"high\",\n  \"checks\": {\n    \"syntax\": {\"valid\": false, \"message\": \"Email must contain @\"}\n  },\n  \"timestamp\": \"2025-01-15T10:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has required fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.have.property('isValid');",
+                  "    pm.expect(json).to.have.property('score');",
+                  "    pm.expect(json).to.have.property('deliverability');",
+                  "    pm.expect(json).to.have.property('risk');",
+                  "    pm.expect(json).to.have.property('checks');",
+                  "});",
+                  "",
+                  "pm.test('Score is between 0 and 100', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.score).to.be.at.least(0);",
+                  "    pm.expect(json.score).to.be.at.most(100);",
+                  "});",
+                  "",
+                  "pm.test('Deliverability is valid enum', function () {",
+                  "    const json = pm.response.json();",
+                  "    const validValues = ['deliverable', 'risky', 'undeliverable', 'unknown'];",
+                  "    pm.expect(validValues).to.include(json.deliverability);",
+                  "});",
+                  "",
+                  "pm.test('Risk is valid enum', function () {",
+                  "    const json = pm.response.json();",
+                  "    const validValues = ['low', 'medium', 'high'];",
+                  "    pm.expect(validValues).to.include(json.risk);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Disposable Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@tempmail.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Example of validating a disposable email address. Disposable emails are flagged as risky."
+          },
+          "response": [
+            {
+              "name": "Disposable Email Detected",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"email\": \"test@tempmail.com\",\n  \"isValid\": true,\n  \"score\": 65,\n  \"deliverability\": \"risky\",\n  \"risk\": \"medium\",\n  \"checks\": {\n    \"syntax\": {\"valid\": true, \"message\": \"Email syntax is valid\"},\n    \"domain\": {\"valid\": true, \"exists\": true},\n    \"mx\": {\"valid\": true, \"records\": [\"mx.tempmail.com\"]},\n    \"disposable\": {\"isDisposable\": true, \"message\": \"Disposable email domain detected\"},\n    \"roleBased\": {\"isRoleBased\": false, \"role\": null},\n    \"freeProvider\": {\"isFree\": false, \"provider\": null},\n    \"typo\": {\"hasTypo\": false, \"suggestion\": null}\n  },\n  \"timestamp\": \"2025-01-15T10:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Detects disposable email', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.checks.disposable.isDisposable).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Deliverability is risky', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.deliverability).to.equal('risky');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate with Typo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@gmial.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Example showing typo detection. Common typos like gmial.com, gmal.com, etc. are detected and a suggestion is provided."
+          },
+          "response": [
+            {
+              "name": "Typo Detected",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"email\": \"test@gmial.com\",\n  \"isValid\": false,\n  \"score\": 40,\n  \"deliverability\": \"unknown\",\n  \"risk\": \"high\",\n  \"checks\": {\n    \"syntax\": {\"valid\": true, \"message\": \"Email syntax is valid\"},\n    \"domain\": {\"valid\": false, \"exists\": false},\n    \"mx\": {\"valid\": false, \"records\": []},\n    \"disposable\": {\"isDisposable\": false},\n    \"roleBased\": {\"isRoleBased\": false, \"role\": null},\n    \"freeProvider\": {\"isFree\": false, \"provider\": null},\n    \"typo\": {\"hasTypo\": true, \"suggestion\": \"gmail.com\"}\n  },\n  \"timestamp\": \"2025-01-15T10:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Detects typo and suggests correction', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.checks.typo.hasTypo).to.be.true;",
+                  "    pm.expect(json.checks.typo.suggestion).to.equal('gmail.com');",
+                  "});",
+                  "",
+                  "pm.test('Email is marked as invalid due to typo', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.isValid).to.be.false;",
+                  "    pm.expect(json.risk).to.equal('high');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Role-Based Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Example of validating a role-based email. Emails like admin@, support@, info@ are detected as role-based."
+          },
+          "response": [
+            {
+              "name": "Role-Based Email Detected",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"email\": \"admin@example.com\",\n  \"isValid\": true,\n  \"score\": 75,\n  \"deliverability\": \"deliverable\",\n  \"risk\": \"medium\",\n  \"checks\": {\n    \"syntax\": {\"valid\": true, \"message\": \"Email syntax is valid\"},\n    \"domain\": {\"valid\": true, \"exists\": true},\n    \"mx\": {\"valid\": true, \"records\": [\"mail.example.com\"]},\n    \"disposable\": {\"isDisposable\": false},\n    \"roleBased\": {\"isRoleBased\": true, \"role\": \"admin\"},\n    \"freeProvider\": {\"isFree\": false, \"provider\": null},\n    \"typo\": {\"hasTypo\": false, \"suggestion\": null}\n  },\n  \"timestamp\": \"2025-01-15T10:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Detects role-based email', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.checks.roleBased.isRoleBased).to.be.true;",
+                  "    pm.expect(json.checks.roleBased.role).to.equal('admin');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk Validate Emails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": [\n    \"test1@gmail.com\",\n    \"test2@yahoo.com\",\n    \"invalid-email\",\n    \"test@tempmail.com\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate-bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate-bulk"]
+            },
+            "description": "Validate multiple email addresses in a single request.\n\n**Limits:**\n- Maximum 1000 emails per request\n- Rate limited based on API key tier\n\n**Response:**\n- `results`: Array of validation results\n- `metadata`: Processing information (total, completed, timedOut, processingTimeMs)"
+          },
+          "response": [
+            {
+              "name": "Bulk Validation Result",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"results\": [\n    {\n      \"email\": \"test1@gmail.com\",\n      \"isValid\": true,\n      \"score\": 100,\n      \"deliverability\": \"deliverable\",\n      \"risk\": \"low\"\n    },\n    {\n      \"email\": \"test2@yahoo.com\",\n      \"isValid\": true,\n      \"score\": 100,\n      \"deliverability\": \"deliverable\",\n      \"risk\": \"low\"\n    },\n    {\n      \"email\": \"invalid-email\",\n      \"isValid\": false,\n      \"score\": 0,\n      \"deliverability\": \"undeliverable\",\n      \"risk\": \"high\"\n    },\n    {\n      \"email\": \"test@tempmail.com\",\n      \"isValid\": true,\n      \"score\": 65,\n      \"deliverability\": \"risky\",\n      \"risk\": \"medium\"\n    }\n  ],\n  \"metadata\": {\n    \"total\": 4,\n    \"completed\": 4,\n    \"timedOut\": false,\n    \"processingTimeMs\": 1250\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns results array', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('results');",
+                  "    pm.expect(json.results).to.be.an('array');",
+                  "    pm.expect(json.results.length).to.equal(4);",
+                  "});",
+                  "",
+                  "pm.test('Returns metadata', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('metadata');",
+                  "    pm.expect(json.metadata).to.have.property('total');",
+                  "    pm.expect(json.metadata).to.have.property('completed');",
+                  "    pm.expect(json.metadata).to.have.property('processingTimeMs');",
+                  "});",
+                  "",
+                  "pm.test('All emails processed', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.metadata.total).to.equal(json.metadata.completed);",
+                  "    pm.expect(json.metadata.timedOut).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "description": "System and health endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check API health status and get system information.\n\nReturns:\n- `status`: healthy | degraded | unhealthy\n- `timestamp`: Current server time\n- `version`: API version"
+          },
+          "response": [
+            {
+              "name": "Healthy Response",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2025-01-15T10:00:00.000Z\",\n  \"version\": \"1.0.0\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Health status is healthy', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('healthy');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('Has timestamp', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('timestamp');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CSP Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/csp-report"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"csp-report\": {\n    \"document-uri\": \"http://localhost:3000/\",\n    \"violated-directive\": \"script-src\",\n    \"blocked-uri\": \"http://evil.com/script.js\",\n    \"source-file\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/csp-report",
+              "host": ["{{base_url}}"],
+              "path": ["api", "csp-report"]
+            },
+            "description": "Endpoint for Content Security Policy violation reports.\n\nThis endpoint receives CSP violation reports from browsers and logs them for security monitoring."
+          },
+          "response": [
+            {
+              "name": "Report Received",
+              "status": "No Content",
+              "code": 204,
+              "body": ""
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error Handling",
+      "description": "Examples of error responses",
+      "item": [
+        {
+          "name": "Missing Email Field",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Example of error response when email field is missing from the request body."
+          },
+          "response": [
+            {
+              "name": "Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Email is required\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Returns error message', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid JSON",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "not valid json"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Example of error response when request body is not valid JSON."
+          },
+          "response": [
+            {
+              "name": "Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Invalid JSON\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk - Empty Emails Array",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate-bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate-bulk"]
+            },
+            "description": "Example of error response when emails array is empty."
+          },
+          "response": [
+            {
+              "name": "Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"At least one email is required\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Returns error message', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk - Too Many Emails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": [\"email1@test.com\", \"... 1001 emails ...\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate-bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate-bulk"]
+            },
+            "description": "Example of error response when more than 1000 emails are submitted."
+          },
+          "response": [
+            {
+              "name": "Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Maximum 1000 emails allowed per request\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// This is a documentation example",
+                  "// To test, you would need to send 1001+ emails"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rate Limit Exceeded",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "When rate limit is exceeded, returns 429 with Retry-After header.\n\n**Rate Limits:**\n- Anonymous: 20 req/min\n- Free tier: 100 req/min\n- Pro tier: 1000 req/min"
+          },
+          "response": [
+            {
+              "name": "Rate Limited",
+              "status": "Too Many Requests",
+              "code": 429,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Retry-After",
+                  "value": "60"
+                }
+              ],
+              "body": "{\n  \"error\": \"Rate limit exceeded\",\n  \"retryAfter\": 60\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// This test intentionally documents rate limiting",
+                  "// Run requests rapidly to trigger rate limit"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Add timestamp to requests for debugging",
+          "pm.request.headers.add({",
+          "    key: 'X-Request-Time',",
+          "    value: new Date().toISOString()",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Log response time for all requests",
+          "console.log('Response time: ' + pm.response.responseTime + 'ms');",
+          "",
+          "// Check for server errors",
+          "pm.test('No server errors', function () {",
+          "    pm.expect(pm.response.code).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}
