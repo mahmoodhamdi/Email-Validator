@@ -5,16 +5,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: mwmsoftware/email-validator:latest
     container_name: email-validator
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-    restart: unless-stopped
+      - API_KEY_REQUIRED=false
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
+    restart: unless-stopped
+
+  # Development service with hot reload
+  email-validator-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: email-validator-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    profiles:
+      - dev

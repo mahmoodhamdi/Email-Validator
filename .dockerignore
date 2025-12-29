@@ -1,16 +1,25 @@
 # Dependencies
 node_modules
-npm-debug.log*
-
-# Next.js
-.next
-out
+.pnp
+.pnp.js
 
 # Testing
 coverage
 .nyc_output
+e2e/test-results
 playwright-report
-test-results
+screenshots
+
+# Build outputs
+.next
+out
+build
+dist
+
+# Development
+.env*.local
+.env.development
+.env.test
 
 # IDE
 .idea
@@ -27,18 +36,23 @@ Thumbs.db
 .gitignore
 
 # Docker
-Dockerfile
-docker-compose*.yml
-.dockerignore
+Dockerfile*
+docker-compose*
+.docker
 
-# Misc
+# Documentation
 *.md
 !README.md
-.env*.local
-.env
-screenshots
-e2e
-src/__tests__
+
+# Tests
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
 jest.config.js
-jest.setup.js
 playwright.config.ts
+
+# Misc
+.eslintcache
+.turbo
+npm-debug.log*
+yarn-error.log*
