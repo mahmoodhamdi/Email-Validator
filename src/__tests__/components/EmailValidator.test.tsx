@@ -80,7 +80,7 @@ describe('EmailValidator', () => {
     // Mock the selector pattern: useHistoryStore((state) => state.addItem)
     mockUseHistoryStore.mockImplementation((selector) => {
       if (typeof selector === 'function') {
-        return selector({ addItem: mockAddItem, items: [], removeItem: jest.fn(), clearHistory: jest.fn() });
+        return selector({ addItem: mockAddItem, items: [], removeItem: jest.fn(), clearHistory: jest.fn(), getItem: jest.fn() });
       }
       return mockAddItem;
     });
