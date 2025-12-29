@@ -77,6 +77,8 @@ const emailSchema = z
  */
 export const singleEmailRequestSchema = z.object({
   email: emailSchema,
+  /** Enable SMTP verification (optional, default: false) */
+  smtpCheck: z.boolean().optional().default(false),
 });
 
 /**
