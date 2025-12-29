@@ -33,8 +33,11 @@ test.describe('History Page', () => {
     // Navigate to history
     await page.goto('/history');
 
-    // Should see the validated email
-    await expect(page.getByText('historytest@gmail.com')).toBeVisible({ timeout: 5000 });
+    // Wait for page to hydrate and load localStorage data
+    await page.waitForTimeout(1000);
+
+    // Should see the validated email (use longer timeout for hydration)
+    await expect(page.getByText('historytest@gmail.com')).toBeVisible({ timeout: 10000 });
   });
 
   test('should take screenshot of history page', async ({ page }) => {

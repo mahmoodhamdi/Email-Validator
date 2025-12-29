@@ -178,7 +178,7 @@ describe('Security Headers Middleware', () => {
 
     test('should not set CORS header for non-allowed origins', () => {
       process.env.ALLOWED_ORIGINS = 'http://trusted.com';
-      process.env.NODE_ENV = 'production';
+      Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true });
 
       const request = createRequest('http://evil.com');
       const response = middleware(request);
