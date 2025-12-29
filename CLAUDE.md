@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev          # Start development server (port 3000)
 npm run build        # Production build
 npm run lint         # Run ESLint
+npm run lint:strict  # ESLint with zero warnings allowed
+npm run format       # Format code with Prettier
+npm run format:check # Check formatting without changes
 npx tsc --noEmit     # Type check without emitting
 ```
 
@@ -19,6 +22,7 @@ npm test -- --watch           # Watch mode
 npm test -- --coverage        # With coverage report
 npm test -- path/to/file      # Run single test file
 
+npx playwright install        # Install browsers (first time only)
 npm run test:e2e              # Run E2E tests (Playwright, requires build)
 npm run test:e2e:ui           # E2E with interactive UI
 npm run test:all              # Run both unit and E2E tests
@@ -44,16 +48,27 @@ The core validation logic is in `src/lib/validators/`. The main orchestrator `in
 
 Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level. Async checks (domain, MX, blacklist) run in parallel for performance.
 
+### Scoring System
+
+Score weights are defined in `src/lib/constants.ts`:
+- MX records: 25% (most critical for deliverability)
+- Syntax + Domain: 20% each (basic validity)
+- Disposable: 15% (abuse prevention)
+- Typo: 10% (user mistake detection)
+- Role-based + Blacklist: 5% each (quality indicators)
+
+Risk thresholds: high < 50, medium 50-79, low ≥ 80
+
 ### Caching & Performance
 
 - `src/lib/cache.ts` - LRU result cache for repeated validations
 - `src/lib/request-dedup.ts` - Deduplicates concurrent requests for same email
-- `src/lib/constants.ts` - Scoring weights and thresholds (configurable)
+- `src/lib/constants.ts` - Scoring weights, thresholds, timeouts, and bulk config
 
 ### Data Files
 
 Static validation data is in `src/lib/data/`:
-- `disposable-domains.ts` - Blocklist of temporary email domains
+- `disposable-domains.ts` - Blocklist of temporary email domains (update with `npm run update:domains`)
 - `free-providers.ts` - List of free email providers
 - `role-emails.ts` - Role-based email prefixes
 - `common-typos.ts` - Domain typo mappings
@@ -90,6 +105,17 @@ All validation types are in `src/types/email.ts`:
 - `ValidationChecks` - All individual check results
 - `DeliverabilityStatus` - deliverable | risky | undeliverable | unknown
 - `RiskLevel` - low | medium | high
+
+## CLI Tool
+
+A standalone CLI tool exists in `cli/` with its own package.json:
+```bash
+cd cli
+npm install
+npm run build
+npm run dev -- <email>    # Test directly with ts-node
+```
+The CLI implements its own lightweight validation logic (no dependency on web app).
 
 ## Path Alias
 
