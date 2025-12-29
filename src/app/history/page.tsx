@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ValidationHistory } from "@/components/email/ValidationHistory";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -22,7 +23,9 @@ export default function HistoryPage() {
             View your recent email validations stored locally in your browser.
           </p>
         </div>
-        <ValidationHistory onRevalidate={handleRevalidate} />
+        <ErrorBoundary componentName="Validation History">
+          <ValidationHistory onRevalidate={handleRevalidate} />
+        </ErrorBoundary>
       </div>
     </div>
   );

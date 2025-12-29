@@ -184,36 +184,54 @@ export class LRUCache<T> {
   }
 }
 
-// Import types for cache instances
+// Import types and configuration
 import type { MxCheck, DomainCheck, ValidationResult } from '@/types/email';
-
-// Cache configuration (duplicated here to avoid circular imports)
-const MX_CACHE_SIZE = 1000;
-const MX_CACHE_TTL = 300000; // 5 minutes
-
-const DOMAIN_CACHE_SIZE = 1000;
-const DOMAIN_CACHE_TTL = 300000; // 5 minutes
-
-const RESULT_CACHE_SIZE = 500;
-const RESULT_CACHE_TTL = 60000; // 1 minute
+import { CACHE_CONFIG } from './constants';
 
 /**
  * Cache for MX record lookups.
  * TTL: 5 minutes (MX records don't change frequently)
  */
-export const mxCache = new LRUCache<MxCheck>(MX_CACHE_SIZE, MX_CACHE_TTL);
+export const mxCache = new LRUCache<MxCheck>(
+  CACHE_CONFIG.mx.maxSize,
+  CACHE_CONFIG.mx.ttlMs
+);
 
 /**
  * Cache for domain validation results.
- * TTL: 5 minutes
+ * TTL: 10 minutes
  */
-export const domainCache = new LRUCache<DomainCheck>(DOMAIN_CACHE_SIZE, DOMAIN_CACHE_TTL);
+export const domainCache = new LRUCache<DomainCheck>(
+  CACHE_CONFIG.domain.maxSize,
+  CACHE_CONFIG.domain.ttlMs
+);
 
 /**
  * Cache for full validation results.
- * TTL: 1 minute (shorter since results may change)
+ * TTL: 5 minutes
  */
-export const resultCache = new LRUCache<ValidationResult>(RESULT_CACHE_SIZE, RESULT_CACHE_TTL);
+export const resultCache = new LRUCache<ValidationResult>(
+  CACHE_CONFIG.result.maxSize,
+  CACHE_CONFIG.result.ttlMs
+);
+
+/**
+ * Cache for catch-all detection results.
+ * TTL: 1 hour (catch-all status rarely changes)
+ */
+export const catchAllCache = new LRUCache<boolean>(
+  CACHE_CONFIG.catchAll.maxSize,
+  CACHE_CONFIG.catchAll.ttlMs
+);
+
+/**
+ * Cache for blacklist check results.
+ * TTL: 30 minutes
+ */
+export const blacklistCache = new LRUCache<boolean>(
+  CACHE_CONFIG.blacklist.maxSize,
+  CACHE_CONFIG.blacklist.ttlMs
+);
 
 /**
  * Clear all caches. Useful for testing.
@@ -222,4 +240,30 @@ export function clearAllCaches(): void {
   mxCache.clear();
   domainCache.clear();
   resultCache.clear();
+  catchAllCache.clear();
+  blacklistCache.clear();
+}
+
+/**
+ * Get aggregated statistics for all caches.
+ */
+export function getAllCacheStats(): Record<string, ReturnType<LRUCache<unknown>['getStats']>> {
+  return {
+    mx: mxCache.getStats(),
+    domain: domainCache.getStats(),
+    result: resultCache.getStats(),
+    catchAll: catchAllCache.getStats(),
+    blacklist: blacklistCache.getStats(),
+  };
+}
+
+/**
+ * Reset statistics for all caches.
+ */
+export function resetAllCacheStats(): void {
+  mxCache.resetStats();
+  domainCache.resetStats();
+  resultCache.resetStats();
+  catchAllCache.resetStats();
+  blacklistCache.resetStats();
 }

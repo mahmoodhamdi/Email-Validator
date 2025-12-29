@@ -1,0 +1,32 @@
+# Security Policy for Email Validator
+# https://securitytxt.org/
+
+# Contact information for security researchers
+Contact: mailto:hmdy7486@gmail.com
+Contact: mailto:mwm.softwars.solutions@gmail.com
+
+# Preferred languages
+Preferred-Languages: en, ar
+
+# Security policy page (if available)
+# Policy: https://yourdomain.com/security-policy
+
+# PGP key for encrypted communications (optional)
+# Encryption: https://yourdomain.com/.well-known/pgp-key.txt
+
+# Acknowledgments page for security researchers (optional)
+# Acknowledgments: https://yourdomain.com/security/thanks
+
+# Canonical URL for this file
+# Canonical: https://yourdomain.com/.well-known/security.txt
+
+# Expiration date (recommended to update annually)
+Expires: 2025-12-31T23:59:59.000Z
+
+# Hiring security researchers (optional)
+# Hiring: https://yourdomain.com/careers
+
+# Comments:
+# We appreciate responsible disclosure of security vulnerabilities.
+# Please provide sufficient details for us to reproduce and fix the issue.
+# We aim to respond to security reports within 48 hours.

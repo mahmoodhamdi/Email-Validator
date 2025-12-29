@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateEmail } from '@/lib/validators';
 import {
-  checkSingleValidationLimit,
+  checkRateLimit,
   getClientIdentifier,
   createRateLimitHeaders,
 } from '@/lib/rate-limiter';
@@ -13,8 +13,15 @@ import {
   RateLimitError,
   ParseError,
   ValidationError,
+  RequestTimeoutError,
   HTTP_STATUS,
 } from '@/lib/errors';
+import {
+  authenticateRequest,
+  createUnauthorizedResponse,
+} from '@/lib/security';
+import { RATE_LIMITS, VALIDATION_TIMEOUTS } from '@/lib/constants';
+import { withTimeout, TimeoutError } from '@/lib/utils/timeout';
 
 /**
  * POST /api/validate
@@ -24,12 +31,33 @@ export async function POST(request: NextRequest) {
   let rateLimitHeaders: HeadersInit = {};
 
   try {
+    // Authenticate the request
+    const auth = authenticateRequest(request, 'validate');
+
+    if (!auth.authenticated) {
+      return createUnauthorizedResponse(
+        auth.error || 'Unauthorized',
+        auth.errorCode || 'UNAUTHORIZED'
+      );
+    }
+
     // Get client identifier for rate limiting
-    const clientId = getClientIdentifier(request);
+    const clientId = auth.apiKey
+      ? `key:${auth.apiKey.key}`
+      : getClientIdentifier(request);
+
+    // Use the rate limit from auth (based on API key tier)
+    const rateLimit = auth.rateLimit;
 
     // Check rate limit
-    const rateLimitResult = checkSingleValidationLimit(clientId);
+    const rateLimitResult = checkRateLimit(
+      `single:${clientId}`,
+      rateLimit,
+      RATE_LIMITS.singleValidation.window
+    );
     rateLimitHeaders = createRateLimitHeaders(rateLimitResult);
+    // Override the limit header with actual limit
+    (rateLimitHeaders as Record<string, string>)['X-RateLimit-Limit'] = String(rateLimit);
 
     if (!rateLimitResult.allowed) {
       throw new RateLimitError('Rate limit exceeded', rateLimitResult.retryAfter);
@@ -56,8 +84,14 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Email cannot be empty', 'EMPTY_EMAIL');
     }
 
-    // Validate email
-    const result = await validateEmail(sanitizedEmail);
+    // Validate email with timeout
+    const result = await withTimeout(
+      validateEmail(sanitizedEmail),
+      {
+        timeoutMs: VALIDATION_TIMEOUTS.singleValidation,
+        errorMessage: `Validation timed out after ${VALIDATION_TIMEOUTS.singleValidation}ms`,
+      }
+    );
 
     return NextResponse.json(result, { headers: rateLimitHeaders });
   } catch (error) {
@@ -66,6 +100,13 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof ParseError || error instanceof ValidationError) {
       return createErrorResponse(error, HTTP_STATUS.BAD_REQUEST, rateLimitHeaders);
+    }
+    if (error instanceof TimeoutError) {
+      return createErrorResponse(
+        new RequestTimeoutError(error.message, error.timeoutMs),
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        rateLimitHeaders
+      );
     }
     return handleError(error, rateLimitHeaders);
   }

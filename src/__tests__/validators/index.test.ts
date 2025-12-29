@@ -182,26 +182,39 @@ describe('validateEmailBulk', () => {
 
   test('should validate multiple emails', async () => {
     const emails = ['user1@example.com', 'user2@example.com', 'user3@example.com'];
-    const results = await validateEmailBulk(emails);
+    const bulkResult = await validateEmailBulk(emails);
 
-    expect(results.length).toBe(3);
-    results.forEach((result, index) => {
+    expect(bulkResult.results.length).toBe(3);
+    expect(bulkResult.metadata.total).toBe(3);
+    expect(bulkResult.metadata.completed).toBe(3);
+    bulkResult.results.forEach((result, index) => {
       expect(result.email).toBe(emails[index]);
     });
   });
 
   test('should handle empty array', async () => {
-    const results = await validateEmailBulk([]);
+    const bulkResult = await validateEmailBulk([]);
 
-    expect(results).toEqual([]);
+    expect(bulkResult.results).toEqual([]);
+    expect(bulkResult.metadata.total).toBe(0);
+    expect(bulkResult.metadata.completed).toBe(0);
   });
 
   test('should handle mixed valid and invalid emails', async () => {
     const emails = ['valid@example.com', 'invalid-email', 'test@example.com'];
-    const results = await validateEmailBulk(emails);
+    const bulkResult = await validateEmailBulk(emails);
 
-    expect(results[0].checks.syntax.valid).toBe(true);
-    expect(results[1].checks.syntax.valid).toBe(false);
-    expect(results[2].checks.syntax.valid).toBe(true);
+    expect(bulkResult.results[0].checks.syntax.valid).toBe(true);
+    expect(bulkResult.results[1].checks.syntax.valid).toBe(false);
+    expect(bulkResult.results[2].checks.syntax.valid).toBe(true);
+  });
+
+  test('should return metadata with processing info', async () => {
+    const emails = ['test@example.com'];
+    const bulkResult = await validateEmailBulk(emails);
+
+    expect(bulkResult.metadata).toBeDefined();
+    expect(bulkResult.metadata.processingTimeMs).toBeGreaterThanOrEqual(0);
+    expect(bulkResult.metadata.timedOut).toBe(false);
   });
 });

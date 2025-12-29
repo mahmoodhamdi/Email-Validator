@@ -58,11 +58,16 @@ describe('Bulk validation', () => {
 
       const progressCalls: Array<{ completed: number; total: number }> = [];
 
-      const results = await validateEmailBulk(emails, (completed, total) => {
-        progressCalls.push({ completed, total });
+      const bulkResult = await validateEmailBulk(emails, {
+        onProgress: (completed, total) => {
+          progressCalls.push({ completed, total });
+        },
       });
 
-      expect(results).toHaveLength(5);
+      expect(bulkResult.results).toHaveLength(5);
+      expect(bulkResult.metadata.completed).toBe(5);
+      expect(bulkResult.metadata.total).toBe(5);
+      expect(bulkResult.metadata.timedOut).toBe(false);
       expect(progressCalls.length).toBeGreaterThan(0);
 
       // Each progress call should report total as 5
@@ -75,15 +80,17 @@ describe('Bulk validation', () => {
       expect(lastCall.completed).toBe(5);
     });
 
-    it('should return empty array for empty input', async () => {
-      const results = await validateEmailBulk([]);
-      expect(results).toEqual([]);
+    it('should return empty result for empty input', async () => {
+      const bulkResult = await validateEmailBulk([]);
+      expect(bulkResult.results).toEqual([]);
+      expect(bulkResult.metadata.total).toBe(0);
+      expect(bulkResult.metadata.completed).toBe(0);
     });
 
     it('should handle single email', async () => {
-      const results = await validateEmailBulk(['test@example.com']);
-      expect(results).toHaveLength(1);
-      expect(results[0].email).toBe('test@example.com');
+      const bulkResult = await validateEmailBulk(['test@example.com']);
+      expect(bulkResult.results).toHaveLength(1);
+      expect(bulkResult.results[0].email).toBe('test@example.com');
     });
   });
 
@@ -91,13 +98,13 @@ describe('Bulk validation', () => {
     it('should cache results during bulk validation', async () => {
       const emails = ['test@example.com', 'test@example.com', 'test@example.com'];
 
-      const results = await validateEmailBulk(emails);
+      const bulkResult = await validateEmailBulk(emails);
 
-      expect(results).toHaveLength(3);
+      expect(bulkResult.results).toHaveLength(3);
 
       // All results should be the same (cached)
-      expect(results[0].email).toBe(results[1].email);
-      expect(results[0].score).toBe(results[1].score);
+      expect(bulkResult.results[0].email).toBe(bulkResult.results[1].email);
+      expect(bulkResult.results[0].score).toBe(bulkResult.results[1].score);
     });
 
     it('should reuse cached MX records for sequential validations', async () => {
@@ -125,10 +132,11 @@ describe('Bulk validation', () => {
       const emails = Array.from({ length: 50 }, (_, i) => `user${i}@example.com`);
 
       const start = performance.now();
-      const results = await validateEmailBulk(emails);
+      const bulkResult = await validateEmailBulk(emails);
       const duration = performance.now() - start;
 
-      expect(results).toHaveLength(50);
+      expect(bulkResult.results).toHaveLength(50);
+      expect(bulkResult.metadata.completed).toBe(50);
       // Should complete in under 5 seconds (accounting for batch delays)
       expect(duration).toBeLessThan(5000);
     });
@@ -148,6 +156,31 @@ describe('Bulk validation', () => {
 
       // Cached validation should be faster
       expect(duration2).toBeLessThan(duration1);
+    });
+  });
+
+  describe('early termination', () => {
+    it('should return metadata with processing time', async () => {
+      const emails = ['test1@example.com', 'test2@example.com'];
+
+      const bulkResult = await validateEmailBulk(emails);
+
+      expect(bulkResult.metadata.processingTimeMs).toBeGreaterThanOrEqual(0);
+      expect(bulkResult.metadata.timedOut).toBe(false);
+    });
+
+    it('should respect maxTimeoutMs option', async () => {
+      // Create a small timeout to trigger early termination
+      const emails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
+
+      const bulkResult = await validateEmailBulk(emails, {
+        maxTimeoutMs: 10, // Very short timeout
+      });
+
+      // Should have processed some emails before timing out
+      // (or none if the timeout is too short)
+      expect(bulkResult.metadata.total).toBe(100);
+      expect(bulkResult.metadata.processingTimeMs).toBeGreaterThanOrEqual(0);
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { EmailValidatorWrapper } from "@/components/email/EmailValidator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function EmailValidatorFallback() {
   return (
@@ -30,9 +31,11 @@ export default function Home() {
             syntax validation, domain verification, MX record lookup, and more.
           </p>
         </div>
-        <Suspense fallback={<EmailValidatorFallback />}>
-          <EmailValidatorWrapper />
-        </Suspense>
+        <ErrorBoundary componentName="Email Validator">
+          <Suspense fallback={<EmailValidatorFallback />}>
+            <EmailValidatorWrapper />
+          </Suspense>
+        </ErrorBoundary>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FeatureCard
             title="Syntax Check"

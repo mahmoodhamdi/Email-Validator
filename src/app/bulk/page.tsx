@@ -1,4 +1,5 @@
 import { BulkValidator } from "@/components/email/BulkValidator";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata = {
   title: "Bulk Email Validation - Email Validator",
@@ -18,7 +19,9 @@ export default function BulkPage() {
             paste your email list.
           </p>
         </div>
-        <BulkValidator />
+        <ErrorBoundary componentName="Bulk Validator">
+          <BulkValidator />
+        </ErrorBoundary>
       </div>
     </div>
   );

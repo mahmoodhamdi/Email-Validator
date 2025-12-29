@@ -84,7 +84,8 @@ describe('POST /api/validate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe('Email cannot be empty');
+    // After trimming, empty string fails minimum length check
+    expect(data.error).toBe('Email must be at least 5 characters');
   });
 
   test('should reject email exceeding max length', async () => {

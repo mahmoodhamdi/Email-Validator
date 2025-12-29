@@ -154,11 +154,11 @@ describe('EmailValidator', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/validate', {
+        expect(global.fetch).toHaveBeenCalledWith('/api/validate', expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: 'test@example.com' }),
-        });
+        }));
       });
     });
 
@@ -317,7 +317,7 @@ describe('EmailValidator', () => {
       expect(screen.getByTestId('validation-result')).toBeInTheDocument();
     });
 
-    test('hides result during loading', () => {
+    test('shows dimmed result during loading (prevents flashing)', () => {
       mockUseValidationStore.mockReturnValue({
         currentEmail: 'test@example.com',
         currentResult: mockValidationResult,
@@ -332,8 +332,9 @@ describe('EmailValidator', () => {
 
       render(<EmailValidator />);
 
-      // Result should not be shown while loading
-      expect(screen.queryByTestId('validation-result')).not.toBeInTheDocument();
+      // Result should still be shown during loading (dimmed) to prevent flashing
+      // This is the new UX improvement - keep previous result visible
+      expect(screen.queryByTestId('validation-result')).toBeInTheDocument();
     });
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -11,6 +11,9 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  Filter,
+  Eye,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,24 +26,93 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ValidationResult } from "@/types/email";
 import { downloadFile } from "@/lib/utils";
-import { RATE_LIMITS } from "@/lib/constants";
+import { RATE_LIMITS, INPUT_LIMITS } from "@/lib/constants";
 import { toast } from "@/hooks/useToast";
+
+// File validation constants
+const MAX_FILE_SIZE = INPUT_LIMITS.maxFileSize;
+const ALLOWED_FILE_TYPES = [".csv", ".txt"];
+const ALLOWED_MIME_TYPES = ["text/csv", "text/plain", "application/vnd.ms-excel"];
+
+// Export filter options
+type ExportFilter = "all" | "valid" | "invalid" | "risky";
 
 export function BulkValidator() {
   const [emails, setEmails] = useState("");
   const [results, setResults] = useState<ValidationResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
+  const [exportFilter, setExportFilter] = useState<ExportFilter>("all");
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseEmails = (input: string): string[] => {
-    const lines = input
-      .split(/[\n,;]/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0 && line.includes("@"));
-    return [...new Set(lines)].slice(0, RATE_LIMITS.maxBulkSize);
+  // Parse emails from input with better CSV support
+  const parseEmails = useCallback((input: string): string[] => {
+    const lines = input.split(/[\n\r]+/);
+
+    // Check if first line looks like a CSV header
+    const firstLine = lines[0]?.toLowerCase() || "";
+    const hasHeader = firstLine.includes("email") || firstLine.includes("e-mail");
+    const startIndex = hasHeader ? 1 : 0;
+
+    const emails: string[] = [];
+
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) {
+        continue;
+      }
+
+      // Split by common delimiters (comma, semicolon, tab)
+      const parts = line.split(/[,;\t]/);
+
+      // Find any email-like values in the parts
+      for (const part of parts) {
+        const trimmed = part.trim().replace(/^["']|["']$/g, ""); // Remove quotes
+        if (trimmed.includes("@") && trimmed.length >= 5) {
+          emails.push(trimmed.toLowerCase());
+        }
+      }
+    }
+
+    // Remove duplicates and limit
+    return [...new Set(emails)].slice(0, RATE_LIMITS.maxBulkSize);
+  }, []);
+
+  // Validate file before processing
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: `File too large. Maximum size is ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB`,
+      };
+    }
+
+    // Check file type
+    const extension = "." + file.name.split(".").pop()?.toLowerCase();
+    const isValidType =
+      ALLOWED_MIME_TYPES.includes(file.type) ||
+      ALLOWED_FILE_TYPES.includes(extension);
+
+    if (!isValidType) {
+      return {
+        valid: false,
+        error: "Invalid file type. Please upload a CSV or TXT file.",
+      };
+    }
+
+    return { valid: true };
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,10 +121,38 @@ export function BulkValidator() {
       return;
     }
 
+    // Validate file
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast({
+        title: "Invalid file",
+        description: validation.error,
+        variant: "destructive",
+      });
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
       setEmails(content);
+      setUploadedFileName(file.name);
+      setShowPreview(true);
+      toast({
+        title: "File loaded",
+        description: `${file.name} (${Math.round(file.size / 1024)}KB)`,
+      });
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Error reading file",
+        description: "Could not read the file. Please try again.",
+        variant: "destructive",
+      });
     };
     reader.readAsText(file);
   };
@@ -103,9 +203,38 @@ export function BulkValidator() {
     } finally {
       setIsLoading(false);
     }
-  }, [emails]);
+  }, [emails, parseEmails]);
+
+  // Filter results based on export filter
+  const getFilteredResults = useCallback(
+    (filter: ExportFilter): ValidationResult[] => {
+      switch (filter) {
+        case "valid":
+          return results.filter((r) => r.isValid);
+        case "invalid":
+          return results.filter((r) => !r.isValid);
+        case "risky":
+          return results.filter(
+            (r) => r.risk === "high" || r.deliverability === "risky"
+          );
+        default:
+          return results;
+      }
+    },
+    [results]
+  );
 
   const handleExportCSV = () => {
+    const filteredResults = getFilteredResults(exportFilter);
+    if (filteredResults.length === 0) {
+      toast({
+        title: "No results to export",
+        description: "There are no results matching the current filter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const headers = [
       "Email",
       "Valid",
@@ -118,7 +247,7 @@ export function BulkValidator() {
       "Blacklisted",
       "Catch-All",
     ];
-    const rows = results.map((r) => [
+    const rows = filteredResults.map((r) => [
       r.email,
       r.isValid ? "Yes" : "No",
       r.score.toString(),
@@ -132,34 +261,82 @@ export function BulkValidator() {
     ]);
 
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
-    downloadFile(csv, "email-validation-results.csv", "text/csv");
+    const filterSuffix = exportFilter !== "all" ? `-${exportFilter}` : "";
+    downloadFile(csv, `email-validation-results${filterSuffix}.csv`, "text/csv");
     toast({
       title: "Exported to CSV",
-      description: `${results.length} results saved`,
+      description: `${filteredResults.length} results saved`,
       variant: "success",
     });
   };
 
   const handleExportJSON = () => {
+    const filteredResults = getFilteredResults(exportFilter);
+    if (filteredResults.length === 0) {
+      toast({
+        title: "No results to export",
+        description: "There are no results matching the current filter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filterSuffix = exportFilter !== "all" ? `-${exportFilter}` : "";
     downloadFile(
-      JSON.stringify(results, null, 2),
-      "email-validation-results.json",
+      JSON.stringify(filteredResults, null, 2),
+      `email-validation-results${filterSuffix}.json`,
       "application/json"
     );
     toast({
       title: "Exported to JSON",
-      description: `${results.length} results saved`,
+      description: `${filteredResults.length} results saved`,
       variant: "success",
     });
+  };
+
+  const handleCopyEmails = async () => {
+    const filteredResults = getFilteredResults(exportFilter);
+    if (filteredResults.length === 0) {
+      toast({
+        title: "No results to copy",
+        description: "There are no results matching the current filter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailList = filteredResults.map((r) => r.email).join("\n");
+    try {
+      await navigator.clipboard.writeText(emailList);
+      toast({
+        title: "Copied to clipboard",
+        description: `${filteredResults.length} emails copied`,
+        variant: "success",
+      });
+    } catch {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy to clipboard.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleClear = () => {
     setEmails("");
     setResults([]);
     setProgress(0);
+    setShowPreview(false);
+    setUploadedFileName(null);
+    setExportFilter("all");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
-  const emailCount = parseEmails(emails).length;
+  // Memoize parsed emails for preview
+  const parsedEmails = useMemo(() => parseEmails(emails), [emails, parseEmails]);
+  const emailCount = parsedEmails.length;
   const validCount = results.filter((r) => r.isValid).length;
   const invalidCount = results.filter((r) => !r.isValid).length;
   const riskyCount = results.filter(
@@ -180,7 +357,7 @@ export function BulkValidator() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <input
               type="file"
               ref={fileInputRef}
@@ -196,6 +373,16 @@ export function BulkValidator() {
               <Upload className="mr-2 h-4 w-4" />
               Upload File
             </Button>
+            {emailCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setShowPreview(!showPreview)}
+                disabled={isLoading}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                {showPreview ? "Hide" : "Show"} Preview
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleClear}
@@ -206,17 +393,72 @@ export function BulkValidator() {
             </Button>
           </div>
 
+          {uploadedFileName && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+              <FileText className="h-4 w-4" />
+              <span>Loaded: {uploadedFileName}</span>
+            </div>
+          )}
+
           <Textarea
             value={emails}
-            onChange={(e) => setEmails(e.target.value)}
+            onChange={(e) => {
+              setEmails(e.target.value);
+              setUploadedFileName(null);
+            }}
             placeholder="Enter emails (one per line or comma-separated)&#10;example@gmail.com&#10;test@yahoo.com&#10;user@company.com"
             className="min-h-[200px] font-mono text-sm"
             disabled={isLoading}
           />
 
+          {/* Email Preview */}
+          <AnimatePresence>
+            {showPreview && emailCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Preview ({Math.min(10, emailCount)} of {emailCount})
+                    </span>
+                    {emailCount > RATE_LIMITS.maxBulkSize && (
+                      <Badge variant="warning">
+                        Limited to {RATE_LIMITS.maxBulkSize} emails
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="max-h-[150px] overflow-y-auto space-y-1">
+                    {parsedEmails.slice(0, 10).map((email, i) => (
+                      <div
+                        key={i}
+                        className="text-sm font-mono bg-background px-2 py-1 rounded"
+                      >
+                        {email}
+                      </div>
+                    ))}
+                    {emailCount > 10 && (
+                      <div className="text-sm text-muted-foreground text-center py-1">
+                        ... and {emailCount - 10} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {emailCount} email{emailCount !== 1 ? "s" : ""} detected
+              {emailCount > RATE_LIMITS.maxBulkSize && (
+                <span className="text-warning ml-1">
+                  (max {RATE_LIMITS.maxBulkSize})
+                </span>
+              )}
             </span>
             <Button
               onClick={handleValidate}
@@ -253,9 +495,28 @@ export function BulkValidator() {
           >
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <CardTitle>Results</CardTitle>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <Select
+                      value={exportFilter}
+                      onValueChange={(value) => setExportFilter(value as ExportFilter)}
+                    >
+                      <SelectTrigger className="w-[130px] h-9">
+                        <Filter className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="Filter" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All ({results.length})</SelectItem>
+                        <SelectItem value="valid">Valid ({validCount})</SelectItem>
+                        <SelectItem value="invalid">Invalid ({invalidCount})</SelectItem>
+                        <SelectItem value="risky">Risky ({riskyCount})</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={handleCopyEmails}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleExportCSV}>
                       <Download className="mr-2 h-4 w-4" />
                       CSV
