@@ -47,6 +47,21 @@ export interface CatchAllCheck {
   isCatchAll: boolean;
 }
 
+export interface SMTPCheck {
+  /** Whether SMTP check was performed */
+  checked: boolean;
+  /** Whether mailbox exists (null = unknown) */
+  exists: boolean | null;
+  /** Whether server is a catch-all */
+  catchAll: boolean;
+  /** Whether greylisting was detected */
+  greylisted: boolean;
+  /** Human-readable message */
+  message: string;
+  /** Time taken for verification in ms */
+  responseTime?: number;
+}
+
 export interface ValidationChecks {
   syntax: SyntaxCheck;
   domain: DomainCheck;
@@ -57,6 +72,8 @@ export interface ValidationChecks {
   typo: TypoCheck;
   blacklisted: BlacklistCheck;
   catchAll: CatchAllCheck;
+  /** Optional SMTP verification result */
+  smtp?: SMTPCheck;
 }
 
 export interface ValidationResult {

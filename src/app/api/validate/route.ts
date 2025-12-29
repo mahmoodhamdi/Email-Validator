@@ -84,12 +84,17 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Email cannot be empty', 'EMPTY_EMAIL');
     }
 
+    // Determine timeout based on whether SMTP check is enabled
+    const timeout = parseResult.data.smtpCheck
+      ? VALIDATION_TIMEOUTS.singleValidation + 15000 // Extra time for SMTP
+      : VALIDATION_TIMEOUTS.singleValidation;
+
     // Validate email with timeout
     const result = await withTimeout(
-      validateEmail(sanitizedEmail),
+      validateEmail(sanitizedEmail, { smtpCheck: parseResult.data.smtpCheck }),
       {
-        timeoutMs: VALIDATION_TIMEOUTS.singleValidation,
-        errorMessage: `Validation timed out after ${VALIDATION_TIMEOUTS.singleValidation}ms`,
+        timeoutMs: timeout,
+        errorMessage: `Validation timed out after ${timeout}ms`,
       }
     );
 

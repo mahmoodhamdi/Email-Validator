@@ -16,6 +16,7 @@ import {
   Download,
   Shield,
   Inbox,
+  MailCheck,
 } from "lucide-react";
 import type { ValidationResult as ValidationResultType } from "@/types/email";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,6 +125,42 @@ export function ValidationResult({ result }: ValidationResultProps) {
       neutral: result.checks.catchAll.isCatchAll,
     },
   ];
+
+  // Add SMTP check if it was performed
+  if (result.checks.smtp?.checked) {
+    const smtpCheck = result.checks.smtp;
+    let message: string;
+    let valid: boolean;
+    let neutral = false;
+
+    if (smtpCheck.exists === true) {
+      message = "Mailbox verified to exist";
+      valid = true;
+    } else if (smtpCheck.exists === false) {
+      message = "Mailbox does not exist";
+      valid = false;
+    } else if (smtpCheck.catchAll) {
+      message = "Server accepts all addresses (catch-all)";
+      valid = true;
+      neutral = true;
+    } else if (smtpCheck.greylisted) {
+      message = "Temporary failure (greylisting)";
+      valid = true;
+      neutral = true;
+    } else {
+      message = smtpCheck.message || "Unknown result";
+      valid = true;
+      neutral = true;
+    }
+
+    checks.push({
+      icon: MailCheck,
+      label: "SMTP Verification",
+      valid,
+      message,
+      neutral,
+    });
+  }
 
   if (result.checks.typo.hasTypo) {
     checks.push({

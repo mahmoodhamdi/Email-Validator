@@ -11,6 +11,7 @@
  * - Free Provider: Gmail, Yahoo, etc. detection
  * - Blacklist: Known spam source checking
  * - Catch-All: Domains that accept all emails
+ * - SMTP: Optional mailbox existence verification
  *
  * Scoring weights are configured in constants.ts and can be adjusted
  * based on business requirements. The default weights prioritize:
@@ -21,7 +22,7 @@
  * 5. Role-based + Blacklist (5% each) - Quality indicators
  *
  * Limitations:
- * - Cannot verify actual inbox existence without SMTP verification
+ * - SMTP verification may be blocked by some servers
  * - Catch-all detection is heuristic-based
  * - Blacklist data may not be real-time
  * - IDN/punycode emails have limited support
@@ -39,6 +40,7 @@ import { validateTypo } from './typo';
 import { validateFreeProvider } from './free-provider';
 import { validateBlacklist } from './blacklist';
 import { validateCatchAll } from './catch-all';
+import { checkSMTP, type SMTPCheckResult } from './smtp';
 
 /**
  * Result of bulk validation with early termination support.
@@ -54,34 +56,58 @@ export interface BulkValidationResult {
 }
 
 /**
+ * Options for email validation
+ */
+export interface ValidationOptions {
+  /** Enable SMTP verification (default: false) */
+  smtpCheck?: boolean;
+  /** SMTP verification timeout in ms (default: 10000) */
+  smtpTimeout?: number;
+}
+
+/**
  * Validate a single email address.
  * Results are cached for improved performance on repeated validations.
  *
  * @param email - The email address to validate
+ * @param options - Validation options
  * @returns Complete validation result
  */
-export async function validateEmail(email: string): Promise<ValidationResult> {
+export async function validateEmail(
+  email: string,
+  options: ValidationOptions = {}
+): Promise<ValidationResult> {
   const normalizedEmail = email.toLowerCase().trim();
 
-  // Check result cache first
-  const cached = resultCache.get(normalizedEmail);
-  if (cached) {
-    // Return cached result with updated timestamp
-    return {
-      ...cached,
-      timestamp: new Date().toISOString(),
-    };
+  // For SMTP checks, use a different cache key
+  const cacheKey = options.smtpCheck
+    ? `${normalizedEmail}:smtp`
+    : normalizedEmail;
+
+  // Check result cache first (skip cache for SMTP checks to ensure fresh results)
+  if (!options.smtpCheck) {
+    const cached = resultCache.get(cacheKey);
+    if (cached) {
+      // Return cached result with updated timestamp
+      return {
+        ...cached,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   // Use deduplication to prevent redundant concurrent requests
-  return deduplicatedValidate(email, performValidation);
+  return deduplicatedValidate(email, (e) => performValidation(e, options));
 }
 
 /**
  * Perform the actual email validation.
  * This is the core validation logic that gets cached.
  */
-async function performValidation(email: string): Promise<ValidationResult> {
+async function performValidation(
+  email: string,
+  options: ValidationOptions = {}
+): Promise<ValidationResult> {
   const timestamp = new Date().toISOString();
   const normalizedEmail = email.toLowerCase().trim();
 
@@ -155,11 +181,11 @@ async function performValidation(email: string): Promise<ValidationResult> {
     score += SCORE_WEIGHTS.blacklist;
   }
 
-  // Determine validity
-  const isValid = syntaxCheck.valid && domainCheck.valid && mxCheck.valid && !typoCheck.hasTypo;
+  // Determine initial validity
+  let isValid = syntaxCheck.valid && domainCheck.valid && mxCheck.valid && !typoCheck.hasTypo;
 
-  // Determine deliverability
-  const deliverability = determineDeliverability(
+  // Determine initial deliverability
+  let deliverability = determineDeliverability(
     syntaxCheck.valid,
     domainCheck.valid,
     mxCheck.valid,
@@ -167,8 +193,8 @@ async function performValidation(email: string): Promise<ValidationResult> {
     blacklistCheck.isBlacklisted
   );
 
-  // Determine risk
-  const risk = determineRisk(
+  // Determine initial risk
+  let risk = determineRisk(
     score,
     disposableCheck.isDisposable,
     roleBasedCheck.isRoleBased,
@@ -176,6 +202,33 @@ async function performValidation(email: string): Promise<ValidationResult> {
     blacklistCheck.isBlacklisted,
     catchAllCheck.isCatchAll
   );
+
+  // Optional SMTP verification
+  let smtpResult: SMTPCheckResult | undefined;
+  if (options.smtpCheck && mxCheck.valid && mxCheck.records.length > 0) {
+    smtpResult = await checkSMTP(email, mxCheck.records, {
+      enabled: true,
+      timeout: options.smtpTimeout || 10000,
+    });
+
+    // Adjust results based on SMTP verification
+    if (smtpResult.checked) {
+      if (smtpResult.exists === false) {
+        // Mailbox confirmed to not exist
+        isValid = false;
+        score = Math.min(score, 20);
+        deliverability = 'undeliverable';
+        risk = 'high';
+      } else if (smtpResult.catchAll) {
+        // Catch-all server - can't confirm mailbox exists
+        score = Math.max(score - 10, 0);
+        if (risk === 'low') {
+          risk = 'medium';
+        }
+      }
+      // Note: greylisting doesn't affect score (temporary issue)
+    }
+  }
 
   const result: ValidationResult = {
     email: email.trim(),
@@ -191,6 +244,7 @@ async function performValidation(email: string): Promise<ValidationResult> {
       typo: typoCheck,
       blacklisted: blacklistCheck,
       catchAll: catchAllCheck,
+      smtp: smtpResult,
     },
     deliverability,
     risk,
@@ -198,7 +252,10 @@ async function performValidation(email: string): Promise<ValidationResult> {
   };
 
   // Cache the result
-  resultCache.set(normalizedEmail, result);
+  const cacheKey = options.smtpCheck
+    ? `${normalizedEmail}:smtp`
+    : normalizedEmail;
+  resultCache.set(cacheKey, result);
 
   return result;
 }
