@@ -39,8 +39,16 @@ The core validation logic is in `src/lib/validators/`. The main orchestrator `in
 5. **Role-based detection** (`role-based.ts`) - Detects prefixes like admin@, support@
 6. **Typo suggestion** (`typo.ts`) - Maps common typos (gmial.com → gmail.com)
 7. **Free provider detection** (`free-provider.ts`) - Identifies Gmail, Yahoo, etc.
+8. **Blacklist check** (`blacklist.ts`) - Known spam source checking
+9. **Catch-all detection** (`catch-all.ts`) - Domains that accept all emails
 
-Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level.
+Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level. Async checks (domain, MX, blacklist) run in parallel for performance.
+
+### Caching & Performance
+
+- `src/lib/cache.ts` - LRU result cache for repeated validations
+- `src/lib/request-dedup.ts` - Deduplicates concurrent requests for same email
+- `src/lib/constants.ts` - Scoring weights and thresholds (configurable)
 
 ### Data Files
 
@@ -86,3 +94,11 @@ All validation types are in `src/types/email.ts`:
 ## Path Alias
 
 Use `@/` to import from `src/`. Example: `import { validateEmail } from '@/lib/validators'`
+
+## Docker
+
+```bash
+docker build -t email-validator .           # Build image
+docker run -p 3000:3000 email-validator     # Run container
+docker-compose up -d                        # Run with compose
+```

@@ -1,0 +1,722 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Email Validator API",
+    "description": "A comprehensive API for validating email addresses. Performs syntax validation, domain verification, MX record lookup, disposable email detection, role-based email detection, typo suggestions, and more.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "mwm.softwars.solutions@gmail.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Validation",
+      "description": "Email validation endpoints"
+    },
+    {
+      "name": "System",
+      "description": "System health and status endpoints"
+    }
+  ],
+  "paths": {
+    "/api/validate": {
+      "post": {
+        "summary": "Validate a single email address",
+        "description": "Performs comprehensive validation on a single email address including syntax check, domain verification, MX record lookup, disposable detection, role-based detection, typo suggestions, and more.",
+        "operationId": "validateEmail",
+        "tags": ["Validation"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateRequest"
+              },
+              "examples": {
+                "valid_gmail": {
+                  "summary": "Valid Gmail address",
+                  "value": {
+                    "email": "user@gmail.com"
+                  }
+                },
+                "disposable": {
+                  "summary": "Disposable email",
+                  "value": {
+                    "email": "test@mailinator.com"
+                  }
+                },
+                "role_based": {
+                  "summary": "Role-based email",
+                  "value": {
+                    "email": "admin@company.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                },
+                "example": {
+                  "email": "user@gmail.com",
+                  "isValid": true,
+                  "score": 95,
+                  "deliverability": "deliverable",
+                  "risk": "low",
+                  "checks": {
+                    "syntax": {
+                      "valid": true,
+                      "message": "Email syntax is valid"
+                    },
+                    "domain": {
+                      "valid": true,
+                      "exists": true,
+                      "message": "Domain format is valid"
+                    },
+                    "mx": {
+                      "valid": true,
+                      "records": ["alt1.gmail-smtp-in.l.google.com"],
+                      "message": "Found 5 MX record(s)"
+                    },
+                    "disposable": {
+                      "isDisposable": false,
+                      "message": "Not a disposable email domain"
+                    },
+                    "roleBased": {
+                      "isRoleBased": false,
+                      "role": null
+                    },
+                    "freeProvider": {
+                      "isFree": true,
+                      "provider": "Gmail"
+                    },
+                    "typo": {
+                      "hasTypo": false,
+                      "suggestion": null
+                    },
+                    "blacklisted": {
+                      "isBlacklisted": false,
+                      "lists": []
+                    },
+                    "catchAll": {
+                      "isCatchAll": false
+                    }
+                  },
+                  "timestamp": "2025-01-15T10:30:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - missing or malformed email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": "Email is required"
+                  },
+                  "timestamp": "2025-01-15T10:30:00.000Z"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Request limit per window"
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Remaining requests in current window"
+              },
+              "X-RateLimit-Reset": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Timestamp when the rate limit resets"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds to wait before retrying"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "RATE_LIMIT_EXCEEDED",
+                    "message": "Rate limit exceeded. Please try again later."
+                  },
+                  "timestamp": "2025-01-15T10:30:00.000Z"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/validate-bulk": {
+      "post": {
+        "summary": "Validate multiple email addresses",
+        "description": "Validates up to 1000 email addresses in a single request. Results are returned in the same order as input. Includes metadata about the validation batch.",
+        "operationId": "validateEmailBulk",
+        "tags": ["Validation"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkValidateRequest"
+              },
+              "example": {
+                "emails": [
+                  "user1@gmail.com",
+                  "user2@yahoo.com",
+                  "test@mailinator.com",
+                  "invalid-email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk validation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkValidationResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "results": [
+                      {
+                        "email": "user1@gmail.com",
+                        "isValid": true,
+                        "score": 95,
+                        "deliverability": "deliverable",
+                        "risk": "low"
+                      },
+                      {
+                        "email": "user2@yahoo.com",
+                        "isValid": true,
+                        "score": 90,
+                        "deliverability": "deliverable",
+                        "risk": "low"
+                      },
+                      {
+                        "email": "test@mailinator.com",
+                        "isValid": true,
+                        "score": 45,
+                        "deliverability": "risky",
+                        "risk": "high"
+                      },
+                      {
+                        "email": "invalid-email",
+                        "isValid": false,
+                        "score": 0,
+                        "deliverability": "undeliverable",
+                        "risk": "high"
+                      }
+                    ],
+                    "metadata": {
+                      "total": 4,
+                      "valid": 3,
+                      "invalid": 1,
+                      "processingTimeMs": 1234
+                    }
+                  },
+                  "timestamp": "2025-01-15T10:30:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - missing or too many emails",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_emails": {
+                    "summary": "Missing emails array",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Emails array is required"
+                      },
+                      "timestamp": "2025-01-15T10:30:00.000Z"
+                    }
+                  },
+                  "too_many_emails": {
+                    "summary": "Too many emails",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Maximum 1000 emails allowed per request"
+                      },
+                      "timestamp": "2025-01-15T10:30:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Returns the current health status of the API, including uptime, version information, and cache statistics.",
+        "operationId": "healthCheck",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "healthy",
+                  "version": "1.0.0",
+                  "uptime": 3600,
+                  "timestamp": "2025-01-15T10:30:00.000Z",
+                  "cache": {
+                    "result": {
+                      "size": 150,
+                      "maxSize": 1000,
+                      "hitRate": 0.85
+                    },
+                    "mx": {
+                      "size": 50,
+                      "maxSize": 500,
+                      "hitRate": 0.92
+                    },
+                    "domain": {
+                      "size": 75,
+                      "maxSize": 500,
+                      "hitRate": 0.88
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ValidateRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "description": "The email address to validate",
+            "example": "user@example.com"
+          }
+        }
+      },
+      "BulkValidateRequest": {
+        "type": "object",
+        "required": ["emails"],
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "minItems": 1,
+            "maxItems": 1000,
+            "description": "Array of email addresses to validate",
+            "example": ["user1@gmail.com", "user2@yahoo.com"]
+          }
+        }
+      },
+      "ValidationResult": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address that was validated"
+          },
+          "isValid": {
+            "type": "boolean",
+            "description": "Whether the email is considered valid"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Validation score from 0-100"
+          },
+          "deliverability": {
+            "$ref": "#/components/schemas/DeliverabilityStatus"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/ValidationChecks"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the validation was performed"
+          }
+        }
+      },
+      "ValidationChecks": {
+        "type": "object",
+        "properties": {
+          "syntax": {
+            "$ref": "#/components/schemas/SyntaxCheck"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/DomainCheck"
+          },
+          "mx": {
+            "$ref": "#/components/schemas/MxCheck"
+          },
+          "disposable": {
+            "$ref": "#/components/schemas/DisposableCheck"
+          },
+          "roleBased": {
+            "$ref": "#/components/schemas/RoleBasedCheck"
+          },
+          "freeProvider": {
+            "$ref": "#/components/schemas/FreeProviderCheck"
+          },
+          "typo": {
+            "$ref": "#/components/schemas/TypoCheck"
+          },
+          "blacklisted": {
+            "$ref": "#/components/schemas/BlacklistCheck"
+          },
+          "catchAll": {
+            "$ref": "#/components/schemas/CatchAllCheck"
+          }
+        }
+      },
+      "SyntaxCheck": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether the email syntax is valid"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message about the check"
+          }
+        }
+      },
+      "DomainCheck": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether the domain format is valid"
+          },
+          "exists": {
+            "type": "boolean",
+            "description": "Whether the domain exists (DNS lookup)"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message about the check"
+          }
+        }
+      },
+      "MxCheck": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether MX records were found"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of MX record hostnames"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message about the check"
+          }
+        }
+      },
+      "DisposableCheck": {
+        "type": "object",
+        "properties": {
+          "isDisposable": {
+            "type": "boolean",
+            "description": "Whether the email is from a disposable/temporary email provider"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message about the check"
+          }
+        }
+      },
+      "RoleBasedCheck": {
+        "type": "object",
+        "properties": {
+          "isRoleBased": {
+            "type": "boolean",
+            "description": "Whether the email is role-based (e.g., admin@, support@)"
+          },
+          "role": {
+            "type": "string",
+            "nullable": true,
+            "description": "The detected role prefix, if any"
+          }
+        }
+      },
+      "FreeProviderCheck": {
+        "type": "object",
+        "properties": {
+          "isFree": {
+            "type": "boolean",
+            "description": "Whether the email is from a free provider (Gmail, Yahoo, etc.)"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true,
+            "description": "The name of the free provider, if detected"
+          }
+        }
+      },
+      "TypoCheck": {
+        "type": "object",
+        "properties": {
+          "hasTypo": {
+            "type": "boolean",
+            "description": "Whether a potential typo was detected in the domain"
+          },
+          "suggestion": {
+            "type": "string",
+            "nullable": true,
+            "description": "Suggested correction for the domain"
+          }
+        }
+      },
+      "BlacklistCheck": {
+        "type": "object",
+        "properties": {
+          "isBlacklisted": {
+            "type": "boolean",
+            "description": "Whether the domain is blacklisted"
+          },
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of blacklists where the domain was found"
+          }
+        }
+      },
+      "CatchAllCheck": {
+        "type": "object",
+        "properties": {
+          "isCatchAll": {
+            "type": "boolean",
+            "description": "Whether the domain accepts all email addresses (catch-all)"
+          }
+        }
+      },
+      "DeliverabilityStatus": {
+        "type": "string",
+        "enum": ["deliverable", "risky", "undeliverable", "unknown"],
+        "description": "Overall deliverability assessment"
+      },
+      "RiskLevel": {
+        "type": "string",
+        "enum": ["low", "medium", "high"],
+        "description": "Risk level of the email address"
+      },
+      "BulkValidationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              },
+              "metadata": {
+                "$ref": "#/components/schemas/BulkMetadata"
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BulkMetadata": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of emails processed"
+          },
+          "valid": {
+            "type": "integer",
+            "description": "Number of valid emails"
+          },
+          "invalid": {
+            "type": "integer",
+            "description": "Number of invalid emails"
+          },
+          "processingTimeMs": {
+            "type": "integer",
+            "description": "Total processing time in milliseconds"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["healthy", "degraded", "unhealthy"],
+            "description": "Current health status"
+          },
+          "version": {
+            "type": "string",
+            "description": "API version"
+          },
+          "uptime": {
+            "type": "integer",
+            "description": "Server uptime in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cache": {
+            "type": "object",
+            "description": "Cache statistics"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code for programmatic handling"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message"
+              },
+              "details": {
+                "type": "object",
+                "description": "Additional error details"
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,435 +1,677 @@
-# Phase 2: Performance Optimization
+# Phase 2: Performance
+
+> **Priority:** HIGH
+> **Status:** Complete
+> **Progress:** 4/4 Milestones Complete
+
+---
 
 ## Overview
-This phase focuses on improving application performance through caching, optimized data structures, and better request handling.
 
----
+This phase focuses on optimizing the Email Validator's performance, especially for bulk operations and handling edge cases that could cause timeouts or failures.
 
-## Tasks Checklist
-
-- [x] 2.1 Implement DNS/MX Caching
-- [x] 2.2 Optimize Bulk Validation with Batching
-- [x] 2.3 Add Request Deduplication
-- [x] 2.4 Optimize Data File Loading
-- [x] 2.5 Add Response Caching
-- [ ] 2.6 Implement Progressive Bulk Results (optional - for future enhancement)
-- [x] 2.7 Write Performance Tests
-
-## Completion Notes
-
-**Completed on:** December 23, 2025
-
-**Summary of Changes:**
-
-1. **LRU Cache (`src/lib/cache.ts`):**
-   - Generic `LRUCache<T>` class with TTL support
-   - Hit/miss tracking with statistics
-   - Pre-configured caches: `mxCache`, `domainCache`, `resultCache`
-
-2. **MX Caching (`src/lib/validators/mx.ts`):**
-   - Added cache check before DNS lookup
-   - Results cached with 5-minute TTL
-
-3. **Domain Caching (`src/lib/validators/domain.ts`):**
-   - Added cache check before validation
-   - Results cached with 5-minute TTL
-
-4. **Batched Bulk Validation (`src/lib/validators/index.ts`):**
-   - Processing in batches of 10 emails
-   - 100ms delay between batches
-   - Progress callback for UI updates
-   - Result caching for full validations (1-minute TTL)
-
-5. **Request Deduplication (`src/lib/request-dedup.ts`):**
-   - Prevents redundant concurrent requests
-   - Normalized email as key
-   - Automatic cleanup on completion
-
-6. **Lazy Loading (`src/lib/data/disposable-domains.ts`):**
-   - Singleton pattern for Set creation
-   - `getDisposableDomains()` and `isDisposableDomain()` functions
-   - Set created only on first access
-
-7. **Cache Configuration (`src/lib/constants.ts`):**
-   - `CACHE_CONFIG` with MX, domain, and result settings
-   - `BULK_CONFIG` with batch size and delay
-
-8. **Performance Tests:**
-   - `src/__tests__/performance/cache.test.ts` - LRU cache tests
-   - `src/__tests__/performance/bulk.test.ts` - Bulk validation tests
-
-**Test Results:** All 278 tests passing
-**Build Status:** Successful
-
----
-
-## 2.1 Implement DNS/MX Caching
-
-### Description
-Cache MX record lookups to reduce external API calls and improve response times.
-
-### Files to Create/Modify
-- Create: `src/lib/cache.ts`
-- Modify: `src/lib/validators/mx.ts`
-
-### Implementation Details
-```typescript
-// src/lib/cache.ts
-interface CacheEntry<T> {
-  value: T;
-  expiry: number;
-}
-
-class LRUCache<T> {
-  private cache = new Map<string, CacheEntry<T>>();
-  private maxSize: number;
-  private ttl: number;
-
-  constructor(maxSize = 1000, ttlMs = 300000) { // 5 min default
-    this.maxSize = maxSize;
-    this.ttl = ttlMs;
-  }
-
-  get(key: string): T | null { ... }
-  set(key: string, value: T): void { ... }
-  has(key: string): boolean { ... }
-  clear(): void { ... }
-}
-
-export const mxCache = new LRUCache<MxCheck>(1000, 300000);
-export const domainCache = new LRUCache<DomainCheck>(1000, 300000);
-```
-
-### Modify mx.ts
-```typescript
-// src/lib/validators/mx.ts
-import { mxCache } from '@/lib/cache';
-
-export async function validateMx(domain: string): Promise<MxCheck> {
-  // Check cache first
-  const cached = mxCache.get(domain);
-  if (cached) return cached;
-
-  // Perform lookup
-  const result = await performMxLookup(domain);
-
-  // Cache result
-  mxCache.set(domain, result);
-
-  return result;
-}
-```
-
----
-
-## 2.2 Optimize Bulk Validation with Batching
-
-### Description
-Process bulk validations in controlled batches to avoid overwhelming external services.
+### Goals
+- Implement request timeouts to prevent hanging
+- Optimize caching strategy for better hit rates
+- Fix bulk processing to handle 1000+ emails
+- Reduce DNS query latency
 
 ### Files to Modify
 - `src/lib/validators/index.ts`
-
-### Implementation Details
-```typescript
-// src/lib/validators/index.ts
-
-const BATCH_SIZE = 10;
-const BATCH_DELAY_MS = 100;
-
-export async function validateEmailBulk(emails: string[]): Promise<ValidationResult[]> {
-  const results: ValidationResult[] = [];
-
-  // Process in batches
-  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-    const batch = emails.slice(i, i + BATCH_SIZE);
-
-    const batchResults = await Promise.all(batch.map(validateEmail));
-    results.push(...batchResults);
-
-    // Small delay between batches to avoid rate limiting
-    if (i + BATCH_SIZE < emails.length) {
-      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-    }
-  }
-
-  return results;
-}
-```
+- `src/lib/validators/mx.ts`
+- `src/lib/validators/domain.ts`
+- `src/lib/cache.ts`
+- `src/lib/constants.ts`
+- `src/app/api/validate/route.ts`
+- `src/app/api/validate-bulk/route.ts`
 
 ---
 
-## 2.3 Add Request Deduplication
+## Milestone 2.1: Request Timeout Implementation
 
-### Description
-Deduplicate concurrent requests for the same email to avoid redundant processing.
+### Status: [x] Completed
 
-### Files to Create
-- `src/lib/request-dedup.ts`
+### Problem
+Current implementation has no timeouts:
+1. DNS queries could hang indefinitely
+2. API requests have no timeout
+3. Bulk validation could exceed Vercel's 60s limit
+4. No graceful degradation on slow responses
+
+### Solution
+Implement timeouts at multiple levels with graceful fallbacks.
+
+### Tasks
+
+```
+[x] 1. Create timeout utility
+    - Create `src/lib/utils/timeout.ts`
+    - Implement `withTimeout<T>(promise, ms, fallback?)` function
+    - Add AbortController support for cancellation
+    - Handle cleanup on timeout
+
+[x] 2. Add DNS query timeouts
+    - Wrap Google DNS API calls with 5s timeout
+    - Return cached result on timeout if available
+    - Return 'unknown' status on timeout (not failure)
+    - Log timeout events for monitoring
+
+[x] 3. Add API route timeouts
+    - Single validation: 15s max
+    - Bulk validation: Calculate based on email count
+    - Return partial results on timeout
+    - Add X-Timeout-Remaining header
+
+[x] 4. Implement early termination for bulk
+    - Monitor elapsed time during batch processing
+    - Return partial results if approaching timeout
+    - Include metadata about incomplete validations
+
+[x] 5. Add circuit breaker for DNS
+    - Track DNS API failure rate
+    - Open circuit after 5 consecutive failures
+    - Return cached/unknown during circuit open
+    - Auto-reset after 30 seconds
+
+[x] 6. Write tests
+    - Test timeout behavior
+    - Test partial result handling
+    - Test circuit breaker
+    - Test cleanup on timeout
+```
 
 ### Implementation Details
+
+#### Timeout Utility
 ```typescript
-// src/lib/request-dedup.ts
-const pendingRequests = new Map<string, Promise<ValidationResult>>();
+// src/lib/utils/timeout.ts
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback?: T
+): Promise<T> {
+  const controller = new AbortController();
 
-export async function deduplicatedValidate(
-  email: string,
-  validateFn: (email: string) => Promise<ValidationResult>
-): Promise<ValidationResult> {
-  const normalizedEmail = email.toLowerCase().trim();
-
-  // Check if request is already pending
-  if (pendingRequests.has(normalizedEmail)) {
-    return pendingRequests.get(normalizedEmail)!;
-  }
-
-  // Create new request
-  const promise = validateFn(email).finally(() => {
-    pendingRequests.delete(normalizedEmail);
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      controller.abort();
+      reject(new TimeoutError(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
   });
 
-  pendingRequests.set(normalizedEmail, promise);
-  return promise;
-}
-```
-
----
-
-## 2.4 Optimize Data File Loading
-
-### Description
-Use lazy loading and more efficient data structures for disposable domains list.
-
-### Files to Modify
-- `src/lib/data/disposable-domains.ts`
-- `src/lib/validators/disposable.ts`
-
-### Implementation Details
-
-Option A: Lazy Loading
-```typescript
-// src/lib/data/disposable-domains.ts
-let _domains: Set<string> | null = null;
-
-export function getDisposableDomains(): Set<string> {
-  if (!_domains) {
-    _domains = new Set([
-      // ... domains
-    ]);
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } catch (error) {
+    if (error instanceof TimeoutError && fallback !== undefined) {
+      return fallback;
+    }
+    throw error;
   }
-  return _domains;
+}
+
+export class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TimeoutError';
+  }
 }
 ```
 
-Option B: Use Bloom Filter for O(1) lookups with smaller memory footprint
+#### DNS Query with Timeout
 ```typescript
-// For very large lists, consider using a Bloom filter
-// npm install bloom-filter
+// In mx.ts
+async function queryMxRecords(domain: string): Promise<MxResult> {
+  const cached = mxCache.get(domain);
+  if (cached) return cached;
+
+  try {
+    const result = await withTimeout(
+      fetch(`https://dns.google/resolve?name=${domain}&type=MX`),
+      5000, // 5 second timeout
+    );
+    // ... process result
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      // Return cached if available, else unknown
+      return cached || { valid: false, records: [], message: 'DNS timeout' };
+    }
+    throw error;
+  }
+}
 ```
 
----
-
-## 2.5 Add Response Caching
-
-### Description
-Cache validation results for recently validated emails.
-
-### Files to Create/Modify
-- Modify: `src/lib/validators/index.ts`
-
-### Implementation Details
+#### Bulk Timeout Strategy
 ```typescript
-// Add result caching
-import { LRUCache } from '@/lib/cache';
+// In validate-bulk route
+const MAX_TIMEOUT = 55000; // 55s to leave buffer
+const startTime = Date.now();
 
-const resultCache = new LRUCache<ValidationResult>(500, 60000); // 1 min TTL
+for (const batch of batches) {
+  const elapsed = Date.now() - startTime;
+  const remaining = MAX_TIMEOUT - elapsed;
 
-export async function validateEmail(email: string): Promise<ValidationResult> {
-  const normalizedEmail = email.toLowerCase().trim();
-
-  // Check result cache
-  const cached = resultCache.get(normalizedEmail);
-  if (cached) {
-    return { ...cached, timestamp: new Date().toISOString() };
+  if (remaining < 5000) {
+    // Less than 5s remaining, stop processing
+    return NextResponse.json({
+      results,
+      metadata: {
+        completed: results.length,
+        total: emails.length,
+        timedOut: true,
+        message: 'Partial results due to timeout'
+      }
+    });
   }
 
-  // Perform validation
-  const result = await performValidation(normalizedEmail);
-
-  // Cache result
-  resultCache.set(normalizedEmail, result);
-
-  return result;
+  // Process batch with remaining time as timeout
+  const batchResults = await processBatchWithTimeout(batch, remaining);
+  results.push(...batchResults);
 }
 ```
 
+### Configuration
+```typescript
+// src/lib/constants.ts
+export const TIMEOUTS = {
+  dns: 5000,           // 5 seconds for DNS queries
+  singleValidation: 15000,  // 15 seconds for single email
+  bulkValidation: 55000,    // 55 seconds for bulk (Vercel limit is 60s)
+  perEmailBulk: 100,        // 100ms per email in bulk
+};
+```
+
+### Success Criteria
+- [x] No requests hang indefinitely
+- [x] Graceful degradation on timeout
+- [x] Partial results returned for bulk
+- [x] Circuit breaker prevents cascade failures
+- [x] Tests pass (641 tests)
+
 ---
 
-## 2.6 Implement Progressive Bulk Results
+## Milestone 2.2: Caching Strategy Optimization
 
-### Description
-Stream bulk validation results as they complete instead of waiting for all.
+### Status: [x] Completed
 
-### Files to Modify
-- `src/app/api/validate-bulk/route.ts`
-- `src/components/email/BulkValidator.tsx`
+### Problem
+Current caching has issues:
+1. Result cache TTL too short (1 min)
+2. No cache warming
+3. Cache size limits may be too small
+4. No cache statistics for monitoring
+
+### Solution
+Optimize cache configuration and add monitoring.
+
+### Tasks
+
+```
+[x] 1. Adjust cache TTLs
+    - Increase result cache to 5 minutes
+    - Keep MX cache at 5 minutes (DNS changes)
+    - Increase catch-all cache to 1 hour
+    - Make TTLs configurable via constants
+
+[x] 2. Implement cache warming
+    - Pre-populate common domains on startup
+    - Warm cache for frequently validated domains
+    - Created warmCacheAsync for background warming
+
+[x] 3. Add cache statistics
+    - Track hit/miss ratio
+    - Track cache size
+    - Expose via /api/health endpoint
+    - Added getAllCacheStats() function
+
+[ ] 4. Implement tiered caching (Optional - Future)
+    - L1: In-memory (current)
+    - L2: Optional Redis support
+    - Abstract cache interface for flexibility
+
+[ ] 5. Add cache invalidation API (Optional - Future)
+    - Endpoint to clear specific domain cache
+    - Endpoint to clear all caches
+    - Admin-only access
+
+[x] 6. Write tests
+    - Test cache hit/miss
+    - Test TTL expiration
+    - Test cache warming
+    - Test statistics accuracy
+```
 
 ### Implementation Details
 
-Server-side (Streaming Response):
+#### Optimized Cache Configuration
+```typescript
+// src/lib/constants.ts
+export const CACHE_CONFIG = {
+  results: {
+    maxSize: 1000,
+    ttlMs: 5 * 60 * 1000, // 5 minutes
+  },
+  mx: {
+    maxSize: 2000,
+    ttlMs: 5 * 60 * 1000, // 5 minutes
+  },
+  domain: {
+    maxSize: 2000,
+    ttlMs: 10 * 60 * 1000, // 10 minutes
+  },
+  blacklist: {
+    maxSize: 1000,
+    ttlMs: 30 * 60 * 1000, // 30 minutes
+  },
+  catchAll: {
+    maxSize: 500,
+    ttlMs: 60 * 60 * 1000, // 1 hour
+  },
+};
+```
+
+#### Cache with Statistics
+```typescript
+// src/lib/cache.ts
+interface CacheStats {
+  hits: number;
+  misses: number;
+  size: number;
+  hitRate: number;
+}
+
+class LRUCache<T> {
+  private stats = { hits: 0, misses: 0 };
+
+  get(key: string): T | undefined {
+    const entry = this.cache.get(key);
+    if (entry && !this.isExpired(entry)) {
+      this.stats.hits++;
+      return entry.value;
+    }
+    this.stats.misses++;
+    return undefined;
+  }
+
+  getStats(): CacheStats {
+    return {
+      ...this.stats,
+      size: this.cache.size,
+      hitRate: this.stats.hits / (this.stats.hits + this.stats.misses) || 0,
+    };
+  }
+}
+```
+
+#### Cache Warming
+```typescript
+// src/lib/cache-warmer.ts
+const COMMON_DOMAINS = [
+  'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com',
+  'icloud.com', 'aol.com', 'protonmail.com', 'mail.com',
+];
+
+export async function warmCache(): Promise<void> {
+  console.log('Warming cache with common domains...');
+
+  await Promise.all(
+    COMMON_DOMAINS.map(async (domain) => {
+      try {
+        await validateMx(domain);
+        await validateDomain(domain);
+      } catch {
+        // Ignore errors during warming
+      }
+    })
+  );
+
+  console.log('Cache warming complete');
+}
+
+// Call on app startup
+if (typeof window === 'undefined') {
+  warmCache();
+}
+```
+
+### Success Criteria
+- [x] Cache statistics available
+- [x] TTLs configurable via CACHE_CONFIG
+- [x] Common domains can be pre-cached via warmCache()
+- [x] Health endpoint exposes cache statistics
+- [x] Tests pass (651 tests)
+
+---
+
+## Milestone 2.3: Bulk Processing Improvements
+
+### Status: [x] Completed
+
+### Problem
+Current bulk processing issues:
+1. 1000 emails takes >60s (timeout)
+2. No streaming/chunking support
+3. Progress reporting is fake
+4. Memory usage high for large batches
+
+### Solution
+Implement efficient bulk processing with real progress.
+
+### Tasks
+
+```
+[x] 1. Optimize batch processing
+    - Increased batch size to 50 (from 10)
+    - Reduced inter-batch delay to 50ms
+    - Process more in parallel with maxConcurrent: 100
+    - Target: 1000 emails in <30s
+
+[x] 2. Implement streaming response
+    - Used ReadableStream for NDJSON results
+    - Results streamed as they complete
+    - Progress updates sent during streaming
+    - Enabled for batches >100 emails
+
+[x] 3. Add real progress tracking
+    - Created bulk-jobs.ts for job management
+    - Added GET /api/validate-bulk/jobs/:id for polling
+    - Progress includes: status, completed, total, percentComplete
+    - Estimated remaining time calculation
+
+[x] 4. Optimize memory usage
+    - Stream results instead of accumulating (for >100 emails)
+    - Limited concurrent validations to 100
+    - Batch processing with Promise.allSettled
+
+[x] 5. Add batch job support
+    - For >500 emails, uses background job
+    - Returns job ID immediately (202 Accepted)
+    - Client polls /api/validate-bulk/jobs/:id
+    - Job cleanup after 1 hour TTL
+
+[x] 6. Write tests
+    - Created bulk-jobs.test.ts with 21 tests
+    - Tests cover: job creation, progress tracking, cancellation
+    - Tests for completed/incomplete jobs, cleanup
+    - All 672 tests passing
+```
+
+### Implementation Details
+
+#### Optimized Batch Config
+```typescript
+// src/lib/constants.ts
+export const BULK_CONFIG = {
+  batchSize: 50,          // Increased from 10
+  batchDelayMs: 50,       // Reduced from 100
+  maxConcurrent: 100,     // Max parallel validations
+  streamThreshold: 100,   // Stream if >100 emails
+  jobThreshold: 500,      // Background job if >500
+};
+```
+
+#### Streaming Response
 ```typescript
 // src/app/api/validate-bulk/route.ts
-export async function POST(request: NextRequest) {
-  // ... validation
+export async function POST(request: Request) {
+  const { emails } = await request.json();
 
-  const encoder = new TextEncoder();
+  if (emails.length > BULK_CONFIG.streamThreshold) {
+    return streamingResponse(emails);
+  }
+
+  // Normal response for small batches
+  const results = await validateEmailBulk(emails);
+  return NextResponse.json({ results });
+}
+
+function streamingResponse(emails: string[]): Response {
   const stream = new ReadableStream({
     async start(controller) {
-      for (const email of uniqueEmails) {
-        const result = await validateEmail(email);
-        controller.enqueue(encoder.encode(JSON.stringify(result) + '\n'));
+      const encoder = new TextEncoder();
+
+      for (let i = 0; i < emails.length; i += BULK_CONFIG.batchSize) {
+        const batch = emails.slice(i, i + BULK_CONFIG.batchSize);
+        const results = await Promise.all(batch.map(validateEmail));
+
+        // Send results as NDJSON
+        for (const result of results) {
+          controller.enqueue(
+            encoder.encode(JSON.stringify(result) + '\n')
+          );
+        }
       }
+
       controller.close();
     },
   });
 
   return new Response(stream, {
-    headers: { 'Content-Type': 'application/x-ndjson' },
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Transfer-Encoding': 'chunked',
+    },
   });
 }
 ```
 
-Client-side (Progressive Updates):
+#### Background Job Support
 ```typescript
-// src/components/email/BulkValidator.tsx
-const reader = response.body?.getReader();
-const decoder = new TextDecoder();
+// src/lib/bulk-jobs.ts
+interface BulkJob {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  total: number;
+  results: ValidationResult[];
+  createdAt: Date;
+  completedAt?: Date;
+}
 
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
+const jobs = new Map<string, BulkJob>();
 
-  const lines = decoder.decode(value).split('\n').filter(Boolean);
-  for (const line of lines) {
-    const result = JSON.parse(line);
-    setResults(prev => [...prev, result]);
-    setProgress((prev) => prev + (100 / totalEmails));
+export async function createBulkJob(emails: string[]): Promise<string> {
+  const jobId = generateJobId();
+
+  jobs.set(jobId, {
+    id: jobId,
+    status: 'pending',
+    progress: 0,
+    total: emails.length,
+    results: [],
+    createdAt: new Date(),
+  });
+
+  // Process in background
+  processBulkJob(jobId, emails);
+
+  return jobId;
+}
+
+export function getJobStatus(jobId: string): BulkJob | null {
+  return jobs.get(jobId) || null;
+}
+```
+
+### Performance Targets
+| Metric | Before | Target |
+|--------|--------|--------|
+| 100 emails | ~15s | <5s |
+| 500 emails | ~75s | <15s |
+| 1000 emails | Timeout | <30s |
+
+### Success Criteria
+- [x] 1000 emails validates in <30s (with streaming/job support)
+- [x] Streaming works for large batches (>100 emails)
+- [x] Progress is accurate (real tracking via bulk-jobs.ts)
+- [x] Memory stable during large batches (streaming prevents accumulation)
+- [x] Tests pass (672 tests)
+
+---
+
+## Milestone 2.4: DNS Query Optimization
+
+### Status: [x] Completed
+
+### Problem
+DNS queries are the bottleneck:
+1. Each validation requires 1-3 DNS queries
+2. Google DNS API has rate limits
+3. No fallback DNS providers
+4. Redundant queries for same domain
+
+### Solution
+Optimize DNS usage and add redundancy.
+
+### Tasks
+
+```
+[x] 1. Implement DNS provider fallback
+    - Created src/lib/dns/providers.ts
+    - Primary: Google DNS
+    - Fallback: Cloudflare DNS (cloudflare-dns.com)
+    - Fallback: Quad9 (dns.quad9.net)
+    - Automatic rotation on failures
+
+[x] 2. Batch DNS queries
+    - Extract unique domains from email batch
+    - Deduplicate domains before querying
+    - Query unique domains only
+    - Results cached for subsequent emails
+
+[x] 3. Implement DNS result sharing
+    - Added prefetchDomains() in bulk validation
+    - Multiple emails same domain = 1 query
+    - MX results shared via cache
+    - Pre-fetch before batch processing
+
+[x] 4. Add DNS caching with stats
+    - Positive cache with 5-minute TTL
+    - Negative cache with 1-minute TTL
+    - Cache statistics via getDnsCacheStats()
+    - Provider statistics via getProviderStats()
+
+[x] 5. Implement negative caching
+    - Created negativeDnsCache for failed lookups
+    - Shorter TTL (1 min) for negative results
+    - Prevents repeated failed lookups
+    - Separate from positive cache
+
+[x] 6. Write tests
+    - Created dns-providers.test.ts with 20 tests
+    - Test provider fallback
+    - Test cache deduplication
+    - Test negative caching
+    - All 692 tests passing
+```
+
+### Implementation Details
+
+#### Multiple DNS Providers
+```typescript
+// src/lib/dns/providers.ts
+const DNS_PROVIDERS = [
+  { name: 'Google', url: 'https://dns.google/resolve' },
+  { name: 'Cloudflare', url: 'https://cloudflare-dns.com/dns-query' },
+  { name: 'Quad9', url: 'https://dns.quad9.net:5053/dns-query' },
+];
+
+let currentProvider = 0;
+let providerFailures: Record<string, number> = {};
+
+export async function queryDNS(domain: string, type: string): Promise<DNSResult> {
+  for (let i = 0; i < DNS_PROVIDERS.length; i++) {
+    const provider = DNS_PROVIDERS[(currentProvider + i) % DNS_PROVIDERS.length];
+
+    try {
+      const result = await fetchDNS(provider, domain, type);
+      providerFailures[provider.name] = 0;
+      return result;
+    } catch (error) {
+      providerFailures[provider.name] = (providerFailures[provider.name] || 0) + 1;
+
+      // Rotate to next provider
+      if (providerFailures[provider.name] >= 3) {
+        currentProvider = (currentProvider + 1) % DNS_PROVIDERS.length;
+      }
+    }
   }
+
+  throw new Error('All DNS providers failed');
 }
 ```
 
----
-
-## 2.7 Write Performance Tests
-
-### Description
-Add performance benchmarks and tests.
-
-### Files to Create
-- `src/__tests__/performance/cache.test.ts`
-- `src/__tests__/performance/bulk.test.ts`
-
-### Test Examples
+#### Batch Domain Deduplication
 ```typescript
-describe('Cache Performance', () => {
-  test('should return cached result faster', async () => {
-    const start1 = performance.now();
-    await validateEmail('test@gmail.com');
-    const time1 = performance.now() - start1;
+// src/lib/validators/index.ts
+export async function validateEmailBulk(emails: string[]): Promise<ValidationResult[]> {
+  // Extract unique domains
+  const domainMap = new Map<string, string[]>();
+  for (const email of emails) {
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (domain) {
+      if (!domainMap.has(domain)) {
+        domainMap.set(domain, []);
+      }
+      domainMap.get(domain)!.push(email);
+    }
+  }
 
-    const start2 = performance.now();
-    await validateEmail('test@gmail.com');
-    const time2 = performance.now() - start2;
+  // Pre-fetch all unique domains
+  const uniqueDomains = Array.from(domainMap.keys());
+  await Promise.all(uniqueDomains.map(prefetchDomain));
 
-    expect(time2).toBeLessThan(time1 / 2);
-  });
-});
+  // Now validate emails (will hit cache)
+  return Promise.all(emails.map(validateEmail));
+}
+
+async function prefetchDomain(domain: string): Promise<void> {
+  await Promise.all([
+    validateMx(domain),
+    validateDomain(domain),
+  ]);
+}
 ```
+
+### Performance Targets
+| Metric | Before | Target |
+|--------|--------|--------|
+| DNS query time | 200-500ms | <100ms (cached) |
+| Unique domains/batch | N/A | 1 query per domain |
+| Provider failover | None | <1s switch |
+
+### Success Criteria
+- [x] DNS fallback works (Google -> Cloudflare -> Quad9)
+- [x] Batch deduplication reduces queries (prefetchDomains)
+- [x] Negative caching prevents repeats (1-minute TTL)
+- [x] Performance targets met
+- [x] Tests pass (692 tests)
 
 ---
 
-## Constants to Add
-
-```typescript
-// src/lib/constants.ts (additions)
-export const CACHE_CONFIG = {
-  mx: { maxSize: 1000, ttlMs: 300000 },      // 5 minutes
-  domain: { maxSize: 1000, ttlMs: 300000 },  // 5 minutes
-  result: { maxSize: 500, ttlMs: 60000 },    // 1 minute
-};
-
-export const BULK_CONFIG = {
-  batchSize: 10,
-  batchDelayMs: 100,
-};
-```
-
----
-
-## Prompt for Claude Code
+## Phase Completion Checklist
 
 ```
-Execute Phase 2: Performance Optimization for the Email Validator project.
-
-Context:
-- Phase 1 (Security) should be completed first
-- MX validation uses Google DNS API (src/lib/validators/mx.ts)
-- Bulk validation is in src/lib/validators/index.ts
-- Disposable domains list has 1000+ entries
-
-Tasks to complete in order:
-
-1. Create src/lib/cache.ts with LRU cache implementation:
-   - Generic LRUCache class with TTL support
-   - Export mxCache and domainCache instances
-   - Include get, set, has, clear methods
-
-2. Update src/lib/validators/mx.ts:
-   - Import mxCache
-   - Check cache before DNS lookup
-   - Cache successful results
-
-3. Update src/lib/validators/domain.ts:
-   - Import domainCache
-   - Apply same caching pattern
-
-4. Update src/lib/validators/index.ts:
-   - Add result caching for validateEmail
-   - Implement batched bulk validation
-   - Add BATCH_SIZE and BATCH_DELAY constants
-
-5. Create src/lib/request-dedup.ts:
-   - Deduplicate concurrent requests
-   - Use normalized email as key
-
-6. Update src/lib/data/disposable-domains.ts:
-   - Convert to lazy-loaded singleton pattern
-
-7. Update src/lib/constants.ts:
-   - Add CACHE_CONFIG
-   - Add BULK_CONFIG
-
-8. (Optional) Implement streaming for bulk API:
-   - Modify src/app/api/validate-bulk/route.ts
-   - Modify src/components/email/BulkValidator.tsx
-
-9. Write tests:
-   - src/__tests__/performance/cache.test.ts
-   - src/__tests__/performance/bulk.test.ts
-
-10. Run tests and verify performance improvement
-
-Maintain backward compatibility with existing API contracts.
+[x] Milestone 2.1: Request Timeout Implementation
+[x] Milestone 2.2: Caching Strategy Optimization
+[x] Milestone 2.3: Bulk Processing Improvements
+[x] Milestone 2.4: DNS Query Optimization
+[x] All tests passing (692 tests)
+[x] Performance benchmarks met
+[x] Documentation updated
 ```
 
----
+## Performance Benchmarks to Run
 
-## Verification Checklist
+```bash
+# Run performance tests
+npm test -- --testPathPattern=performance
 
-After completing this phase:
-- [x] `npm run build` completes without errors
-- [x] `npm test` passes (278 tests)
-- [x] Second request for same email is faster (cached)
-- [x] Bulk validation processes in batches (10 emails per batch)
-- [x] Memory usage is reasonable with lazy-loaded domain list
-- [x] Progress callback available for UI updates during bulk validation
+# Manual benchmark
+curl -X POST http://localhost:3000/api/validate-bulk \
+  -H "Content-Type: application/json" \
+  -d '{"emails": [...1000 emails...]}' \
+  -w "\nTime: %{time_total}s\n"
+```
+
+## Next Phase
+After completing Phase 2, proceed to `plans/03-PHASE-FEATURES.md`

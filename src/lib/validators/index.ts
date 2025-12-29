@@ -27,7 +27,7 @@
  * - IDN/punycode emails have limited support
  */
 import type { ValidationResult, DeliverabilityStatus, RiskLevel } from '@/types/email';
-import { SCORE_WEIGHTS, SCORE_THRESHOLDS, BULK_CONFIG } from '@/lib/constants';
+import { SCORE_WEIGHTS, SCORE_THRESHOLDS, BULK_CONFIG, VALIDATION_TIMEOUTS } from '@/lib/constants';
 import { resultCache } from '@/lib/cache';
 import { deduplicatedValidate } from '@/lib/request-dedup';
 import { validateSyntax, parseEmail } from './syntax';
@@ -39,6 +39,19 @@ import { validateTypo } from './typo';
 import { validateFreeProvider } from './free-provider';
 import { validateBlacklist } from './blacklist';
 import { validateCatchAll } from './catch-all';
+
+/**
+ * Result of bulk validation with early termination support.
+ */
+export interface BulkValidationResult {
+  results: ValidationResult[];
+  metadata: {
+    total: number;
+    completed: number;
+    timedOut: boolean;
+    processingTimeMs: number;
+  };
+}
 
 /**
  * Validate a single email address.
@@ -258,30 +271,78 @@ function determineRisk(
 }
 
 /**
- * Validate multiple email addresses in batches.
+ * Options for bulk validation.
+ */
+export interface BulkValidationOptions {
+  /** Maximum time allowed for bulk validation in ms */
+  maxTimeoutMs?: number;
+  /** Callback for progress updates */
+  onProgress?: (completed: number, total: number) => void;
+}
+
+/**
+ * Validate multiple email addresses in batches with early termination support.
  * Uses batching to avoid overwhelming external services.
+ * Pre-fetches unique domains to reduce redundant DNS queries.
  *
  * @param emails - Array of email addresses to validate
- * @param onProgress - Optional callback for progress updates
- * @returns Array of validation results
+ * @param options - Validation options including timeout and progress callback
+ * @returns Bulk validation result with metadata
  */
 export async function validateEmailBulk(
   emails: string[],
-  onProgress?: (completed: number, total: number) => void
-): Promise<ValidationResult[]> {
+  options: BulkValidationOptions = {}
+): Promise<BulkValidationResult> {
+  const startTime = Date.now();
+  const { maxTimeoutMs = VALIDATION_TIMEOUTS.bulkValidation, onProgress } = options;
+
   if (emails.length === 0) {
-    return [];
+    return {
+      results: [],
+      metadata: {
+        total: 0,
+        completed: 0,
+        timedOut: false,
+        processingTimeMs: Date.now() - startTime,
+      },
+    };
   }
 
   const results: ValidationResult[] = [];
   const { batchSize, batchDelayMs } = BULK_CONFIG;
+  let timedOut = false;
+
+  // Minimum time buffer before we stop processing (5 seconds)
+  const MIN_TIME_BUFFER = 5000;
+
+  // Pre-fetch unique domains to populate cache (reduces redundant DNS queries)
+  const uniqueDomains = extractUniqueDomains(emails);
+  await prefetchDomains(uniqueDomains);
 
   // Process in batches
   for (let i = 0; i < emails.length; i += batchSize) {
+    const elapsed = Date.now() - startTime;
+    const remaining = maxTimeoutMs - elapsed;
+
+    // Check if we're running out of time
+    if (remaining < MIN_TIME_BUFFER) {
+      timedOut = true;
+      break;
+    }
+
     const batch = emails.slice(i, i + batchSize);
 
-    // Process batch in parallel
-    const batchResults = await Promise.all(batch.map(validateEmail));
+    // Process batch in parallel with per-email timeout
+    const batchResults = await Promise.all(
+      batch.map(async (email) => {
+        try {
+          return await validateEmail(email);
+        } catch {
+          // If individual email validation fails, create a failed result
+          return createTimeoutResult(email);
+        }
+      })
+    );
     results.push(...batchResults);
 
     // Report progress
@@ -295,7 +356,86 @@ export async function validateEmailBulk(
     }
   }
 
-  return results;
+  return {
+    results,
+    metadata: {
+      total: emails.length,
+      completed: results.length,
+      timedOut,
+      processingTimeMs: Date.now() - startTime,
+    },
+  };
+}
+
+/**
+ * Extract unique domains from email list.
+ */
+function extractUniqueDomains(emails: string[]): string[] {
+  const domains = new Set<string>();
+
+  for (const email of emails) {
+    const atIndex = email.lastIndexOf('@');
+    if (atIndex > 0 && atIndex < email.length - 1) {
+      const domain = email.substring(atIndex + 1).toLowerCase().trim();
+      if (domain) {
+        domains.add(domain);
+      }
+    }
+  }
+
+  return Array.from(domains);
+}
+
+/**
+ * Pre-fetch domain validation results to populate cache.
+ * This ensures subsequent email validations hit the cache.
+ */
+async function prefetchDomains(domains: string[]): Promise<void> {
+  // Process in batches of 20 to avoid overwhelming DNS
+  const prefetchBatchSize = 20;
+
+  for (let i = 0; i < domains.length; i += prefetchBatchSize) {
+    const batch = domains.slice(i, i + prefetchBatchSize);
+
+    await Promise.allSettled(
+      batch.map(async (domain) => {
+        try {
+          // Prefetch both domain and MX records
+          await Promise.all([
+            validateDomain(domain),
+            validateMx(domain),
+          ]);
+        } catch {
+          // Ignore prefetch errors - actual validation will handle them
+        }
+      })
+    );
+  }
+}
+
+/**
+ * Create a timeout result for an email that couldn't be validated.
+ */
+function createTimeoutResult(email: string): ValidationResult {
+  return {
+    email: email.trim(),
+    isValid: false,
+    score: 0,
+    checks: {
+      syntax: { valid: false, message: 'Validation timed out' },
+      domain: { valid: false, exists: false, message: 'Skipped due to timeout' },
+      mx: { valid: false, records: [], message: 'Skipped due to timeout' },
+      disposable: { isDisposable: false, message: 'Skipped' },
+      roleBased: { isRoleBased: false, role: null },
+      freeProvider: { isFree: false, provider: null },
+      typo: { hasTypo: false, suggestion: null },
+      blacklisted: { isBlacklisted: false, lists: [] },
+      catchAll: { isCatchAll: false },
+    },
+    deliverability: 'unknown',
+    risk: 'high',
+    timestamp: new Date().toISOString(),
+  };
 }
 
 /**

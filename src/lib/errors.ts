@@ -14,6 +14,7 @@ export const HTTP_STATUS = {
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
+  PAYLOAD_TOO_LARGE: 413,
   TOO_MANY_REQUESTS: 429,
   INTERNAL_SERVER_ERROR: 500,
 } as const;
@@ -76,6 +77,27 @@ export class ParseError extends Error {
   constructor(message: string = 'Failed to parse request') {
     super(message);
     this.name = 'ParseError';
+  }
+}
+
+/**
+ * Error class for request timeout errors.
+ */
+export class RequestTimeoutError extends Error {
+  public readonly statusCode: number = HTTP_STATUS.INTERNAL_SERVER_ERROR;
+  public readonly code: string = 'REQUEST_TIMEOUT';
+  public readonly timeoutMs: number;
+
+  /**
+   * Create a new RequestTimeoutError.
+   *
+   * @param message - Human-readable error message
+   * @param timeoutMs - The timeout that was exceeded
+   */
+  constructor(message: string = 'Request timed out', timeoutMs: number = 0) {
+    super(message);
+    this.name = 'RequestTimeoutError';
+    this.timeoutMs = timeoutMs;
   }
 }
 
@@ -146,6 +168,10 @@ export function handleError(
   }
 
   if (error instanceof ParseError) {
+    return createErrorResponse(error, error.statusCode, headers);
+  }
+
+  if (error instanceof RequestTimeoutError) {
     return createErrorResponse(error, error.statusCode, headers);
   }
 

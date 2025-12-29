@@ -1,279 +1,446 @@
-# Phase 1: Security & Critical Fixes
+# Phase 1: Security
+
+> **Priority:** CRITICAL
+> **Status:** In Progress
+> **Progress:** 3/4 Milestones Complete
+
+---
 
 ## Overview
-This phase focuses on addressing security vulnerabilities and critical issues that could expose the application to attacks or abuse.
 
----
+This phase focuses on securing the Email Validator API and preventing abuse. Currently, the API has no authentication, rate limiting can be bypassed, and input validation has gaps.
 
-## Tasks Checklist
-
-- [ ] 1.1 Implement Rate Limiting
-- [ ] 1.2 Add Input Sanitization
-- [ ] 1.3 Configure CORS
-- [ ] 1.4 Add Security Headers
-- [ ] 1.5 Implement API Key Authentication (Optional)
-- [ ] 1.6 Add Request Validation Middleware
-- [ ] 1.7 Write Security Tests
-
----
-
-## 1.1 Implement Rate Limiting
-
-### Description
-The `RATE_LIMITS` constants exist but are never enforced. Implement actual rate limiting to prevent API abuse.
+### Goals
+- Implement API key authentication
+- Fix rate limiting vulnerabilities
+- Strengthen input validation
+- Audit security headers
 
 ### Files to Modify
 - `src/app/api/validate/route.ts`
 - `src/app/api/validate-bulk/route.ts`
-- Create: `src/lib/rate-limiter.ts`
-
-### Implementation Details
-```typescript
-// src/lib/rate-limiter.ts
-// Create an in-memory rate limiter using Map with IP tracking
-// For production, use Redis-based solution
-
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
-
-const rateLimitMap = new Map<string, RateLimitEntry>();
-
-export function checkRateLimit(
-  ip: string,
-  limit: number,
-  windowMs: number
-): { allowed: boolean; remaining: number; resetTime: number }
-```
-
-### Tests Required
-- Test rate limit enforcement
-- Test window reset
-- Test different IPs tracked separately
+- `src/middleware.ts`
+- `src/lib/rate-limiter.ts`
+- `src/lib/security/` (new directory)
+- `next.config.js`
 
 ---
 
-## 1.2 Add Input Sanitization
+## Milestone 1.1: API Authentication System
 
-### Description
-Sanitize email inputs to prevent XSS and injection attacks.
+### Status: [x] Completed
 
-### Files to Modify
-- `src/app/api/validate/route.ts`
-- `src/app/api/validate-bulk/route.ts`
-- Create: `src/lib/sanitize.ts`
+### Problem
+Anyone can call `/api/validate` and `/api/validate-bulk` without authentication. This exposes the service to:
+- DDoS attacks
+- Resource abuse
+- Scraping/data harvesting
+
+### Solution
+Implement API key authentication with optional bypass for frontend.
+
+### Tasks
+
+```
+[x] 1. Create API key management system
+    - Create `src/lib/security/api-keys.ts`
+    - Implement API key validation function
+    - Support multiple API keys with different permissions
+    - Add key expiration support
+
+[x] 2. Create authentication middleware
+    - Create `src/lib/security/auth.ts`
+    - Check for `X-API-Key` header
+    - Validate key against stored keys
+    - Return 401 for invalid/missing keys
+    - Allow bypass for same-origin requests (frontend)
+
+[x] 3. Update API routes
+    - Add auth check to `/api/validate`
+    - Add auth check to `/api/validate-bulk`
+    - Return proper error responses
+
+[x] 4. Add environment variables
+    - `API_KEYS` - Comma-separated list of valid API keys
+    - `API_KEY_REQUIRED` - Enable/disable requirement
+    - Update `.env.example` with documentation
+
+[x] 5. Write tests
+    - Test valid API key
+    - Test invalid API key
+    - Test missing API key
+    - Test same-origin bypass
+    - Test key expiration
+
+[x] 6. Update API documentation
+    - Document authentication in `/api-docs`
+    - Add examples with API key header
+```
 
 ### Implementation Details
-```typescript
-// src/lib/sanitize.ts
-export function sanitizeEmail(email: string): string {
-  // Remove HTML tags
-  // Normalize unicode
-  // Trim excessive whitespace
-  // Limit length
-}
 
-export function sanitizeEmailArray(emails: string[]): string[] {
-  // Apply sanitization to each email
-  // Remove duplicates
-  // Limit array size
+#### API Key Structure
+```typescript
+interface APIKey {
+  key: string;
+  name: string;
+  permissions: ('validate' | 'bulk' | 'admin')[];
+  rateLimit?: number; // Override default rate limit
+  expiresAt?: Date;
+  createdAt: Date;
 }
 ```
 
+#### Authentication Flow
+```
+Request → Check X-API-Key header
+  ├── Header missing?
+  │   ├── Same-origin request? → Allow (frontend)
+  │   └── External request? → 401 Unauthorized
+  ├── Key invalid? → 401 Unauthorized
+  ├── Key expired? → 401 Unauthorized
+  └── Key valid? → Continue to route handler
+```
+
+#### Environment Variables
+```env
+# API Authentication
+API_KEY_REQUIRED=true
+API_KEYS=key1:name1:validate,bulk;key2:name2:validate
+# Format: key:name:permissions;key:name:permissions
+```
+
+### Test Commands
+```bash
+npm test -- src/__tests__/security/
+npm test -- --coverage --collectCoverageFrom='src/lib/security/**'
+```
+
+### Success Criteria
+- [x] All API calls require valid API key (when enabled)
+- [x] Frontend can still work without API key (same-origin)
+- [x] Invalid keys return 401 with clear error message
+- [x] Tests pass with >90% coverage
+- [x] Documentation updated
+
 ---
 
-## 1.3 Configure CORS
+## Milestone 1.2: Rate Limiting Improvements
 
-### Description
-Add CORS configuration to control which origins can access the API.
+### Status: [x] Completed
 
-### Files to Modify
-- Create: `src/middleware.ts` or add to existing Next.js config
+### Problem
+Current rate limiting has vulnerabilities:
+1. Client ID falls back to 'unknown' for localhost
+2. No per-key rate limiting
+3. Easy to bypass with proxy headers
+
+### Solution
+Implement robust client identification and per-key limits.
+
+### Tasks
+
+```
+[x] 1. Improve client identification
+    - Use combination of IP + User-Agent hash
+    - Add session-based fallback
+    - Remove trust of X-Forwarded-For without validation
+    - Add fingerprinting for browsers
+
+[x] 2. Implement per-key rate limits
+    - Different limits per API key tier
+    - Free tier: 100 requests/min
+    - Pro tier: 1000 requests/min
+    - Override via API key config
+
+[x] 3. Add rate limit headers
+    - X-RateLimit-Limit
+    - X-RateLimit-Remaining
+    - X-RateLimit-Reset
+    - Retry-After (on 429)
+
+[x] 4. Implement sliding window algorithm
+    - Replace fixed window with sliding window
+    - More accurate rate limiting
+    - Prevent burst attacks at window boundaries
+
+[x] 5. Add rate limit bypass for trusted IPs
+    - Configure trusted IP ranges
+    - Allow internal services to bypass
+
+[x] 6. Write tests
+    - Test rate limit enforcement
+    - Test per-key limits
+    - Test header responses
+    - Test sliding window accuracy
+```
 
 ### Implementation Details
+
+#### Client ID Generation
 ```typescript
-// src/middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+function getClientId(request: Request): string {
+  const ip = getClientIP(request);
+  const userAgent = request.headers.get('user-agent') || '';
+  const apiKey = request.headers.get('x-api-key');
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+  if (apiKey) {
+    return `key:${apiKey}`;
+  }
 
-  // Add CORS headers
-  response.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGINS || '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  return response;
+  // Hash IP + UA for privacy
+  return `client:${hash(ip + userAgent)}`;
 }
+```
 
-export const config = {
-  matcher: '/api/:path*',
+#### Rate Limit Tiers
+```typescript
+const RATE_LIMITS = {
+  anonymous: { requests: 20, window: 60000 },   // 20/min
+  free: { requests: 100, window: 60000 },       // 100/min
+  pro: { requests: 1000, window: 60000 },       // 1000/min
+  enterprise: { requests: 10000, window: 60000 } // 10000/min
 };
 ```
 
+### Success Criteria
+- [x] No rate limit bypass possible
+- [x] Per-key rate limits working
+- [x] Rate limit headers present
+- [x] Tests pass (33 rate limiter tests)
+
 ---
 
-## 1.4 Add Security Headers
+## Milestone 1.3: Input Validation & Sanitization
 
-### Description
-Add security headers to protect against common web vulnerabilities.
+### Status: [x] Completed
 
-### Files to Modify
-- `next.config.js` or `next.config.mjs`
+### Problem
+Current input validation has gaps:
+1. No maximum length on textarea input
+2. Email parsing in bulk is simplistic
+3. File upload has no size limit
+4. Some XSS patterns might slip through
+
+### Solution
+Strengthen all input validation layers.
+
+### Tasks
+
+```
+[x] 1. Add input length limits
+    - Single email: max 254 characters
+    - Bulk textarea: max 100KB
+    - File upload: max 10MB
+    - API request body: max 1MB
+
+[x] 2. Improve email parsing
+    - Use proper RFC 5322 parser for bulk
+    - Handle quoted strings correctly
+    - Handle comments in emails
+    - Better CSV parsing
+
+[x] 3. Strengthen sanitization
+    - Add more XSS pattern detection
+    - Sanitize file names
+    - Validate Content-Type headers
+    - Strip null bytes
+
+[x] 4. Add request validation middleware
+    - Validate Content-Type
+    - Validate Content-Length
+    - Reject malformed JSON
+    - Add request size limits
+
+[x] 5. Update Zod schemas
+    - Add stricter email validation
+    - Add array length limits
+    - Add string length limits
+    - Custom error messages
+
+[x] 6. Write tests
+    - Test length limit enforcement
+    - Test XSS prevention
+    - Test malformed input handling
+    - Test file validation
+```
 
 ### Implementation Details
-```javascript
-// next.config.js
-const securityHeaders = [
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'X-XSS-Protection', value: '1; mode=block' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Content-Security-Policy', value: "default-src 'self'; ..." },
-];
 
-module.exports = {
-  async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+#### Input Limits
+```typescript
+const INPUT_LIMITS = {
+  email: {
+    maxLength: 254,
+    minLength: 5,
+  },
+  bulk: {
+    maxEmails: 1000,
+    maxTextareaSize: 100 * 1024, // 100KB
+    maxFileSize: 10 * 1024 * 1024, // 10MB
+  },
+  request: {
+    maxBodySize: 1024 * 1024, // 1MB
   },
 };
 ```
 
----
-
-## 1.5 Implement API Key Authentication (Optional)
-
-### Description
-Add optional API key authentication for production use.
-
-### Files to Create
-- `src/lib/auth.ts`
-- Modify API routes
-
-### Implementation Details
+#### Enhanced Sanitization
 ```typescript
-// src/lib/auth.ts
-export function validateApiKey(request: NextRequest): boolean {
-  const apiKey = request.headers.get('X-API-Key');
-  if (!apiKey) return true; // Allow unauthenticated for public use
-
-  // Validate against stored keys
-  return isValidKey(apiKey);
+function sanitizeEmail(email: string): string {
+  return email
+    .trim()
+    .toLowerCase()
+    .replace(/[\x00-\x1F\x7F]/g, '') // Control chars
+    .replace(/<[^>]*>/g, '')          // HTML tags
+    .replace(/javascript:/gi, '')      // JS protocol
+    .replace(/data:/gi, '')            // Data protocol
+    .replace(/vbscript:/gi, '')        // VB protocol
+    .slice(0, INPUT_LIMITS.email.maxLength);
 }
 ```
 
+### Success Criteria
+- [x] All inputs have enforced limits
+- [x] XSS attacks blocked
+- [x] Malformed requests rejected
+- [x] Tests pass (569 total tests)
+
 ---
 
-## 1.6 Add Request Validation Middleware
+## Milestone 1.4: Security Headers & CORS Audit
 
-### Description
-Create reusable request validation using Zod schemas.
+### Status: [x] Completed
 
-### Files to Create
-- `src/lib/validation-schemas.ts`
+### Problem
+Current security configuration needs review:
+1. CSP allows unsafe-inline (required by Next.js but can be improved)
+2. CORS might be too permissive
+3. Some headers might be missing
+
+### Solution
+Audit and strengthen security headers.
+
+### Tasks
+
+```
+[x] 1. Audit current CSP
+    - Review unsafe-inline necessity
+    - Add nonce-based scripts where possible
+    - Tighten connect-src
+    - Add report-uri for CSP violations
+
+[x] 2. Review CORS configuration
+    - List allowed origins explicitly
+    - Remove wildcard if present
+    - Add credentials handling
+    - Test preflight requests
+
+[x] 3. Add missing security headers
+    - Cross-Origin-Embedder-Policy
+    - Cross-Origin-Opener-Policy
+    - Cross-Origin-Resource-Policy
+    - Cache-Control for sensitive endpoints
+
+[x] 4. Implement CSP reporting
+    - Set up report endpoint
+    - Log CSP violations
+    - Alert on suspicious patterns
+
+[x] 5. Add security.txt
+    - Create /.well-known/security.txt
+    - Add contact information
+    - Add disclosure policy
+
+[x] 6. Write tests
+    - Test all security headers present
+    - Test CORS enforcement
+    - Test CSP blocking
+```
 
 ### Implementation Details
+
+#### Enhanced Security Headers
 ```typescript
-// src/lib/validation-schemas.ts
-import { z } from 'zod';
-
-export const singleEmailSchema = z.object({
-  email: z.string().email().max(254),
-});
-
-export const bulkEmailSchema = z.object({
-  emails: z.array(z.string().email().max(254)).min(1).max(1000),
-});
+const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Required for Next.js
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self' https://dns.google",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "report-uri /api/csp-report",
+    ].join('; '),
+  },
+  {
+    key: 'Cross-Origin-Embedder-Policy',
+    value: 'require-corp',
+  },
+  {
+    key: 'Cross-Origin-Opener-Policy',
+    value: 'same-origin',
+  },
+  {
+    key: 'Cross-Origin-Resource-Policy',
+    value: 'same-origin',
+  },
+];
 ```
+
+#### CORS Configuration
+```typescript
+const corsConfig = {
+  allowedOrigins: [
+    process.env.NEXT_PUBLIC_APP_URL,
+    'https://yourdomain.com',
+  ],
+  allowedMethods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-API-Key'],
+  maxAge: 86400, // 24 hours
+};
+```
+
+### Success Criteria
+- [x] All security headers present and correct
+- [x] CORS properly configured
+- [x] CSP violations logged
+- [x] Tests pass (588 total tests)
 
 ---
 
-## 1.7 Write Security Tests
-
-### Description
-Add tests specifically for security features.
-
-### Files to Create
-- `src/__tests__/security/rate-limiter.test.ts`
-- `src/__tests__/security/sanitize.test.ts`
-
----
-
-## Environment Variables Needed
-
-Create `.env.example`:
-```
-# Rate Limiting
-RATE_LIMIT_SINGLE=100
-RATE_LIMIT_BULK=10
-RATE_LIMIT_WINDOW_MS=60000
-
-# CORS
-ALLOWED_ORIGINS=http://localhost:3000
-
-# API Authentication (Optional)
-API_KEYS=key1,key2,key3
-```
-
----
-
-## Prompt for Claude Code
+## Phase Completion Checklist
 
 ```
-Execute Phase 1: Security & Critical Fixes for the Email Validator project.
-
-Context:
-- This is a Next.js 14 email validation application
-- Rate limits are defined in src/lib/constants.ts but not enforced
-- API routes are in src/app/api/
-
-Tasks to complete in order:
-
-1. Create src/lib/rate-limiter.ts with in-memory rate limiting
-   - Track requests by IP address
-   - Use RATE_LIMITS from constants
-   - Return rate limit info in response headers
-
-2. Create src/lib/sanitize.ts for input sanitization
-   - sanitizeEmail function to clean single email
-   - sanitizeEmailArray for bulk emails
-
-3. Update src/app/api/validate/route.ts:
-   - Import and use rate limiter
-   - Import and use sanitizer
-   - Add rate limit headers to response
-
-4. Update src/app/api/validate-bulk/route.ts:
-   - Same as above with bulk limits
-
-5. Create src/middleware.ts for CORS and security headers
-
-6. Update next.config.js with security headers
-
-7. Create src/lib/validation-schemas.ts with Zod schemas
-
-8. Create .env.example with all needed environment variables
-
-9. Write tests:
-   - src/__tests__/security/rate-limiter.test.ts
-   - src/__tests__/security/sanitize.test.ts
-
-10. Run all tests to verify nothing is broken
-
-After each file creation/modification, ensure TypeScript compiles without errors.
-Maintain existing functionality while adding security features.
+[ ] Milestone 1.1: API Authentication System
+[ ] Milestone 1.2: Rate Limiting Improvements
+[ ] Milestone 1.3: Input Validation & Sanitization
+[ ] Milestone 1.4: Security Headers & CORS Audit
+[ ] All tests passing
+[ ] Security audit passed
+[ ] Documentation updated
 ```
 
----
+## Commands to Run After Phase Completion
 
-## Verification Checklist
+```bash
+# Run all tests
+npm run test:all
 
-After completing this phase:
-- [ ] `npm run lint` passes
-- [ ] `npm run build` completes without errors
-- [ ] `npm test` passes
-- [ ] Rate limiting works (test with rapid requests)
-- [ ] CORS headers present in API responses
-- [ ] Security headers present on all pages
+# Check for security vulnerabilities
+npm audit
+
+# Build and verify
+npm run build
+
+# Run E2E tests
+npm run test:e2e
+```
+
+## Next Phase
+After completing Phase 1, proceed to `plans/02-PHASE-PERFORMANCE.md`

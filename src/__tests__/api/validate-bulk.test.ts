@@ -5,31 +5,39 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/validate-bulk/route';
 import { clearAllRateLimits } from '@/lib/rate-limiter';
 
-// Mock the validators module
+// Mock the validators module with new BulkValidationResult format
 jest.mock('@/lib/validators', () => ({
-  validateEmailBulk: jest.fn((emails: string[]) =>
-    Promise.resolve(
-      emails.map((email) => ({
-        email,
-        isValid: true,
-        score: 85,
-        checks: {
-          syntax: { valid: true, message: 'Valid' },
-          domain: { valid: true, exists: true, message: 'Valid' },
-          mx: { valid: true, records: ['mx.example.com'], message: 'Found' },
-          disposable: { isDisposable: false, message: 'Not disposable' },
-          roleBased: { isRoleBased: false, role: null },
-          freeProvider: { isFree: false, provider: null },
-          typo: { hasTypo: false, suggestion: null },
-          blacklisted: { isBlacklisted: false, lists: [] },
-          catchAll: { isCatchAll: false },
-        },
-        deliverability: 'deliverable',
-        risk: 'low',
-        timestamp: new Date().toISOString(),
-      }))
-    )
-  ),
+  validateEmailBulk: jest.fn((emails: string[]) => {
+    const results = emails.map((email) => ({
+      email,
+      isValid: true,
+      score: 85,
+      checks: {
+        syntax: { valid: true, message: 'Valid' },
+        domain: { valid: true, exists: true, message: 'Valid' },
+        mx: { valid: true, records: ['mx.example.com'], message: 'Found' },
+        disposable: { isDisposable: false, message: 'Not disposable' },
+        roleBased: { isRoleBased: false, role: null },
+        freeProvider: { isFree: false, provider: null },
+        typo: { hasTypo: false, suggestion: null },
+        blacklisted: { isBlacklisted: false, lists: [] },
+        catchAll: { isCatchAll: false },
+      },
+      deliverability: 'deliverable',
+      risk: 'low',
+      timestamp: new Date().toISOString(),
+    }));
+
+    return Promise.resolve({
+      results,
+      metadata: {
+        total: emails.length,
+        completed: emails.length,
+        timedOut: false,
+        processingTimeMs: 10,
+      },
+    });
+  }),
 }));
 
 describe('POST /api/validate-bulk', () => {
@@ -139,11 +147,12 @@ describe('POST /api/validate-bulk', () => {
   });
 
   test('should sanitize and filter invalid emails', async () => {
+    // Use strings that pass Zod validation (non-empty) but fail email format validation
     const emails = [
       'valid@example.com',
-      'notanemail', // No @
-      '', // Empty
-      '   ', // Whitespace only
+      'notanemail', // No @ - passes Zod string check, filtered by sanitization
+      'missing-domain@', // Invalid format - filtered by sanitization
+      '@nodomain.com', // No local part - filtered by sanitization
     ];
     const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
       method: 'POST',
@@ -156,6 +165,22 @@ describe('POST /api/validate-bulk', () => {
     expect(response.status).toBe(200);
     expect(data.results.length).toBe(1);
     expect(data.metadata.invalidRemoved).toBeGreaterThan(0);
+  });
+
+  test('should reject bulk request with empty strings', async () => {
+    const emails = [
+      '', // Empty string fails Zod validation
+    ];
+    const request = new NextRequest('http://localhost:3000/api/validate-bulk', {
+      method: 'POST',
+      body: JSON.stringify({ emails }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Email cannot be empty');
   });
 });
 
