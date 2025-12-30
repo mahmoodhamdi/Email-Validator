@@ -44,6 +44,11 @@ import { checkSMTP, type SMTPCheckResult } from './smtp';
 import { checkAuthentication, type AuthCheckResult } from './authentication';
 import { checkReputation, type ReputationCheckResult } from './reputation';
 import { checkGravatarProfile, type GravatarCheckResult } from './gravatar';
+import {
+  checkCustomBlacklist,
+  type CustomBlacklistCheckResult,
+  type Blacklist,
+} from './custom-blacklist';
 
 /**
  * Result of bulk validation with early termination support.
@@ -78,6 +83,8 @@ export interface ValidationOptions {
   gravatarCheck?: boolean;
   /** Gravatar check timeout in ms (default: 5000) */
   gravatarTimeout?: number;
+  /** Custom blacklists to check against */
+  customBlacklists?: Blacklist[];
 }
 
 /**
@@ -393,6 +400,35 @@ async function performValidation(
       }
     : undefined;
 
+  // Custom blacklist check
+  let customBlacklistResult: CustomBlacklistCheckResult | undefined;
+  if (options.customBlacklists && options.customBlacklists.length > 0) {
+    customBlacklistResult = checkCustomBlacklist(normalizedEmail, options.customBlacklists, {
+      enabled: true,
+    });
+
+    // Adjust results if blacklisted
+    if (customBlacklistResult.checked && customBlacklistResult.result?.isBlacklisted) {
+      isValid = false;
+      score = 0;
+      deliverability = 'undeliverable';
+      risk = 'high';
+    }
+  }
+
+  // Convert CustomBlacklistCheckResult to CustomBlacklistCheck for the response
+  const customBlacklistCheck = customBlacklistResult
+    ? {
+        checked: customBlacklistResult.checked,
+        isBlacklisted: customBlacklistResult.result?.isBlacklisted,
+        matchedCount: customBlacklistResult.result?.matchedEntries.length,
+        matchedPatterns: customBlacklistResult.result?.matchedEntries
+          .slice(0, 3)
+          .map((e) => e.pattern),
+        message: customBlacklistResult.message,
+      }
+    : undefined;
+
   const result: ValidationResult = {
     email: email.trim(),
     isValid,
@@ -411,6 +447,7 @@ async function performValidation(
       authentication: authenticationCheck,
       reputation: reputationCheck,
       gravatar: gravatarCheck,
+      customBlacklist: customBlacklistCheck,
     },
     deliverability,
     risk,
@@ -418,6 +455,7 @@ async function performValidation(
   };
 
   // Cache the result with appropriate key based on options
+  // Note: Don't cache results with custom blacklists as they are user-specific
   let cacheKeySuffix = normalizedEmail;
   if (options.smtpCheck) {
     cacheKeySuffix += ':smtp';
@@ -431,7 +469,10 @@ async function performValidation(
   if (options.gravatarCheck) {
     cacheKeySuffix += ':grav';
   }
-  resultCache.set(cacheKeySuffix, result);
+  // Only cache if no custom blacklists (they're user-specific)
+  if (!options.customBlacklists || options.customBlacklists.length === 0) {
+    resultCache.set(cacheKeySuffix, result);
+  }
 
   return result;
 }
