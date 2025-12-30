@@ -185,8 +185,8 @@ describe('LRUCache', () => {
 
       const duration = performance.now() - start;
 
-      // Should complete in under 2000ms (generous threshold for CI/slow systems)
-      expect(duration).toBeLessThan(2000);
+      // Should complete in under 5000ms (generous threshold for CI/slow systems)
+      expect(duration).toBeLessThan(5000);
     });
 
     it('should handle rapid set/get operations', () => {

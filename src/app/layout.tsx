@@ -8,6 +8,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { PWAProvider } from "@/components/pwa/PWAProvider";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { DirectionProvider } from "@/components/providers/DirectionProvider";
+import { ShortcutsProvider } from "@/contexts/ShortcutsContext";
+import { GlobalShortcuts } from "@/components/shortcuts/GlobalShortcuts";
 
 const inter = Inter({ subsets: ["latin", "arabic"] });
 
@@ -90,14 +92,17 @@ export default async function RootLayout({
       <body className={inter.className}>
         <LanguageProvider locale={locale} messages={messages}>
           <DirectionProvider>
-            <PWAProvider>
-              <div className="relative flex min-h-screen flex-col">
-                <Header />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-              <Toaster />
-            </PWAProvider>
+            <ShortcutsProvider>
+              <GlobalShortcuts />
+              <PWAProvider>
+                <div className="relative flex min-h-screen flex-col">
+                  <Header />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </div>
+                <Toaster />
+              </PWAProvider>
+            </ShortcutsProvider>
           </DirectionProvider>
         </LanguageProvider>
       </body>
