@@ -134,7 +134,7 @@ export async function verifySMTP(
             ...result,
             responseTime: Date.now() - startTime,
           };
-        } catch (error) {
+        } catch {
           // Try next attempt/host/port
           continue;
         }
