@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   CheckCircle2,
@@ -627,13 +628,13 @@ export function ValidationResult({ result }: ValidationResultProps) {
                 <div className="flex items-start gap-4">
                   {/* Gravatar Image */}
                   <div className="flex-shrink-0">
-                    <img
+                    <Image
                       src={result.checks.gravatar.gravatar.thumbnailUrl}
                       alt="Gravatar"
-                      className="w-16 h-16 rounded-full border-2 border-green-200 dark:border-green-800"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
+                      width={64}
+                      height={64}
+                      className="rounded-full border-2 border-green-200 dark:border-green-800"
+                      unoptimized
                     />
                   </div>
 
