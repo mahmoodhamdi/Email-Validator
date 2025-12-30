@@ -41,6 +41,7 @@ import { validateFreeProvider } from './free-provider';
 import { validateBlacklist } from './blacklist';
 import { validateCatchAll } from './catch-all';
 import { checkSMTP, type SMTPCheckResult } from './smtp';
+import { checkAuthentication, type AuthCheckResult } from './authentication';
 
 /**
  * Result of bulk validation with early termination support.
@@ -63,6 +64,10 @@ export interface ValidationOptions {
   smtpCheck?: boolean;
   /** SMTP verification timeout in ms (default: 10000) */
   smtpTimeout?: number;
+  /** Enable authentication check (SPF/DMARC/DKIM) (default: false) */
+  authCheck?: boolean;
+  /** Authentication check timeout in ms (default: 10000) */
+  authTimeout?: number;
 }
 
 /**
@@ -79,13 +84,17 @@ export async function validateEmail(
 ): Promise<ValidationResult> {
   const normalizedEmail = email.toLowerCase().trim();
 
-  // For SMTP checks, use a different cache key
-  const cacheKey = options.smtpCheck
-    ? `${normalizedEmail}:smtp`
-    : normalizedEmail;
+  // Build cache key based on options
+  let cacheKey = normalizedEmail;
+  if (options.smtpCheck) {
+    cacheKey += ':smtp';
+  }
+  if (options.authCheck) {
+    cacheKey += ':auth';
+  }
 
-  // Check result cache first (skip cache for SMTP checks to ensure fresh results)
-  if (!options.smtpCheck) {
+  // Check result cache first (skip for SMTP/auth checks to ensure fresh results)
+  if (!options.smtpCheck && !options.authCheck) {
     const cached = resultCache.get(cacheKey);
     if (cached) {
       // Return cached result with updated timestamp
@@ -230,6 +239,57 @@ async function performValidation(
     }
   }
 
+  // Optional email authentication check (SPF/DMARC/DKIM)
+  let authResult: AuthCheckResult | undefined;
+  if (options.authCheck && domainCheck.valid) {
+    authResult = await checkAuthentication(domain, {
+      enabled: true,
+      timeout: options.authTimeout || 10000,
+    });
+
+    // Adjust score based on authentication
+    if (authResult.checked && authResult.authentication) {
+      const authScore = authResult.authentication.score;
+      // Bonus for excellent authentication (up to +5 points)
+      if (authScore >= 80) {
+        score = Math.min(100, score + 5);
+      }
+      // Slight penalty for no authentication (-5 points)
+      if (authScore === 0) {
+        score = Math.max(0, score - 5);
+      }
+    }
+  }
+
+  // Convert AuthCheckResult to AuthenticationCheck for the response
+  const authenticationCheck = authResult
+    ? {
+        checked: authResult.checked,
+        authentication: authResult.authentication
+          ? {
+              spf: {
+                exists: authResult.authentication.spf.exists,
+                strength: authResult.authentication.spf.strength,
+                message: authResult.authentication.spf.message,
+              },
+              dmarc: {
+                exists: authResult.authentication.dmarc.exists,
+                strength: authResult.authentication.dmarc.strength,
+                message: authResult.authentication.dmarc.message,
+              },
+              dkim: {
+                found: authResult.authentication.dkim.found,
+                recordCount: authResult.authentication.dkim.records.length,
+                message: authResult.authentication.dkim.message,
+              },
+              score: authResult.authentication.score,
+              summary: authResult.authentication.summary,
+            }
+          : undefined,
+        message: authResult.message,
+      }
+    : undefined;
+
   const result: ValidationResult = {
     email: email.trim(),
     isValid,
@@ -245,17 +305,22 @@ async function performValidation(
       blacklisted: blacklistCheck,
       catchAll: catchAllCheck,
       smtp: smtpResult,
+      authentication: authenticationCheck,
     },
     deliverability,
     risk,
     timestamp,
   };
 
-  // Cache the result
-  const cacheKey = options.smtpCheck
-    ? `${normalizedEmail}:smtp`
-    : normalizedEmail;
-  resultCache.set(cacheKey, result);
+  // Cache the result with appropriate key based on options
+  let cacheKeySuffix = normalizedEmail;
+  if (options.smtpCheck) {
+    cacheKeySuffix += ':smtp';
+  }
+  if (options.authCheck) {
+    cacheKeySuffix += ':auth';
+  }
+  resultCache.set(cacheKeySuffix, result);
 
   return result;
 }

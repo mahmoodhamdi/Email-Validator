@@ -45,8 +45,27 @@ The core validation logic is in `src/lib/validators/`. The main orchestrator `in
 7. **Free provider detection** (`free-provider.ts`) - Identifies Gmail, Yahoo, etc.
 8. **Blacklist check** (`blacklist.ts`) - Known spam source checking
 9. **Catch-all detection** (`catch-all.ts`) - Domains that accept all emails
+10. **SMTP verification** (`smtp.ts`) - Optional mailbox existence check via SMTP
 
 Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level. Async checks (domain, MX, blacklist) run in parallel for performance.
+
+### SMTP Verification
+
+The SMTP client in `src/lib/smtp/` performs mailbox existence verification:
+- `client.ts` - SMTP connection and RCPT TO verification
+- `types.ts` - SMTPCheckResult type definitions
+
+SMTP verification is optional (disabled by default) and can detect:
+- Non-existent mailboxes (confirmed undeliverable)
+- Catch-all servers (accepts all addresses)
+- Greylisting (temporary rejection)
+
+### Email Authentication (In Progress)
+
+The `src/lib/auth/` module provides SPF/DMARC/DKIM record checking:
+- `spf.ts` - SPF record parsing and validation
+- `dmarc.ts` - DMARC policy checking
+- `types.ts` - Authentication result types
 
 ### Scoring System
 
@@ -63,7 +82,9 @@ Risk thresholds: high < 50, medium 50-79, low ≥ 80
 
 - `src/lib/cache.ts` - LRU result cache for repeated validations
 - `src/lib/request-dedup.ts` - Deduplicates concurrent requests for same email
-- `src/lib/constants.ts` - Scoring weights, thresholds, timeouts, and bulk config
+- `src/lib/constants.ts` - Scoring weights, thresholds, timeouts, bulk config, and cache TTLs
+
+Bulk validation pre-fetches unique domains to reduce redundant DNS queries and processes in configurable batches (default: 50 emails per batch).
 
 ### Data Files
 
@@ -81,7 +102,7 @@ Uses Zustand for state:
 
 ### API Routes
 
-- `POST /api/validate` - Single email validation
+- `POST /api/validate` - Single email validation (supports `smtpCheck` option)
 - `POST /api/validate-bulk` - Batch validation (array of emails)
 - `GET /api/health` - Health check endpoint
 
@@ -90,13 +111,7 @@ Uses Zustand for state:
 - `/` - Single email validation with real-time results
 - `/bulk` - Bulk validation with CSV/TXT upload and export
 - `/history` - Validation history from localStorage
-- `/api-docs` - API documentation
-
-### UI Components
-
-- `src/components/ui/` - Shadcn/Radix-based primitives (button, input, card, etc.)
-- `src/components/layout/` - Header, Footer, ThemeToggle
-- `src/components/email/` - Domain-specific: EmailValidator, BulkValidator, ValidationResult, ScoreIndicator, ValidationHistory
+- `/api-docs` - API documentation (Swagger UI)
 
 ### Key Types
 
