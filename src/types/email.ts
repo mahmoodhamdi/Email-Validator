@@ -138,6 +138,19 @@ export interface GravatarCheck {
   message: string;
 }
 
+export interface CustomBlacklistCheck {
+  /** Whether the check was performed */
+  checked: boolean;
+  /** Whether the email is blacklisted */
+  isBlacklisted?: boolean;
+  /** Number of matched rules */
+  matchedCount?: number;
+  /** Matched patterns (first few) */
+  matchedPatterns?: string[];
+  /** Human-readable message */
+  message: string;
+}
+
 export interface ValidationChecks {
   syntax: SyntaxCheck;
   domain: DomainCheck;
@@ -156,6 +169,8 @@ export interface ValidationChecks {
   reputation?: ReputationCheck;
   /** Optional Gravatar profile result */
   gravatar?: GravatarCheck;
+  /** Optional custom blacklist result */
+  customBlacklist?: CustomBlacklistCheck;
 }
 
 export interface ValidationResult {
