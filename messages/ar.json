@@ -1,0 +1,139 @@
+{
+  "common": {
+    "appName": "مدقق البريد الإلكتروني",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجاح",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "next": "التالي",
+    "submit": "إرسال",
+    "clear": "مسح",
+    "copy": "نسخ",
+    "copied": "تم النسخ!",
+    "download": "تحميل",
+    "upload": "رفع"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "bulk": "التحقق الجماعي",
+    "history": "السجل",
+    "apiDocs": "وثائق API",
+    "analytics": "التحليلات",
+    "settings": "الإعدادات"
+  },
+  "home": {
+    "title": "مدقق البريد الإلكتروني",
+    "subtitle": "تحقق من عناوين البريد الإلكتروني فوراً مع فحوصات شاملة تشمل التحقق من الصيغة والنطاق وسجلات MX والمزيد.",
+    "placeholder": "أدخل عنوان البريد الإلكتروني",
+    "validateButton": "تحقق",
+    "validating": "جاري التحقق..."
+  },
+  "features": {
+    "syntaxCheck": "فحص الصيغة",
+    "syntaxCheckDesc": "تحقق من صيغة البريد الإلكتروني وفقاً لمعيار RFC 5322",
+    "domainVerification": "التحقق من النطاق",
+    "domainVerificationDesc": "تحقق من وجود نطاق البريد الإلكتروني وصلاحيته",
+    "mxRecords": "سجلات MX",
+    "mxRecordsDesc": "تحقق من وجود خادم البريد عبر سجلات MX",
+    "disposableDetection": "كشف البريد المؤقت",
+    "disposableDetectionDesc": "تحديد عناوين البريد المؤقتة والمستهلكة",
+    "roleBasedCheck": "فحص الدور الوظيفي",
+    "roleBasedCheckDesc": "كشف عناوين البريد الوظيفية مثل admin@ أو support@",
+    "typoSuggestions": "اقتراحات الأخطاء",
+    "typoSuggestionsDesc": "احصل على اقتراحات تصحيح للأخطاء الشائعة في النطاقات"
+  },
+  "validation": {
+    "valid": "صالح",
+    "invalid": "غير صالح",
+    "risky": "محفوف بالمخاطر",
+    "unknown": "غير معروف",
+    "deliverable": "قابل للتسليم",
+    "undeliverable": "غير قابل للتسليم",
+    "score": "النتيجة",
+    "deliverability": "قابلية التسليم",
+    "risk": "مستوى المخاطر",
+    "low": "منخفض",
+    "medium": "متوسط",
+    "high": "مرتفع",
+    "checks": "فحوصات التحقق",
+    "syntax": "الصيغة",
+    "domain": "النطاق",
+    "mx": "سجلات MX",
+    "disposable": "مؤقت",
+    "roleBased": "دور وظيفي",
+    "freeProvider": "مزود مجاني",
+    "smtp": "SMTP",
+    "typoSuggestion": "هل تقصد {suggestion}؟"
+  },
+  "bulk": {
+    "title": "التحقق الجماعي من البريد الإلكتروني",
+    "subtitle": "تحقق من عناوين بريد إلكتروني متعددة دفعة واحدة",
+    "uploadFile": "رفع ملف",
+    "pasteEmails": "أو الصق العناوين",
+    "placeholder": "أدخل العناوين (واحد في كل سطر)",
+    "validateAll": "تحقق من الكل",
+    "processing": "جاري معالجة {current} من {total}...",
+    "complete": "اكتمل التحقق",
+    "summary": "الملخص",
+    "totalEmails": "إجمالي العناوين",
+    "validEmails": "صالح",
+    "invalidEmails": "غير صالح",
+    "riskyEmails": "محفوف بالمخاطر",
+    "exportResults": "تصدير النتائج",
+    "exportCSV": "تصدير كـ CSV",
+    "exportJSON": "تصدير كـ JSON"
+  },
+  "history": {
+    "title": "سجل التحقق",
+    "subtitle": "عرض عمليات التحقق الأخيرة",
+    "noHistory": "لا يوجد سجل تحقق بعد",
+    "clearHistory": "مسح السجل",
+    "confirmClear": "هل أنت متأكد من مسح كل السجل؟",
+    "validatedAt": "تم التحقق في"
+  },
+  "apiDocs": {
+    "title": "وثائق API",
+    "subtitle": "دمج التحقق من البريد الإلكتروني في تطبيقاتك",
+    "endpoint": "نقطة النهاية",
+    "method": "الطريقة",
+    "request": "الطلب",
+    "response": "الاستجابة",
+    "tryIt": "جربه",
+    "authentication": "المصادقة",
+    "rateLimit": "حد الطلبات"
+  },
+  "analytics": {
+    "title": "لوحة التحليلات",
+    "subtitle": "عرض إحصائيات استخدام API",
+    "totalRequests": "إجمالي الطلبات",
+    "avgResponseTime": "متوسط وقت الاستجابة",
+    "successRate": "معدل النجاح",
+    "errorRate": "معدل الخطأ"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "language": "اللغة",
+    "theme": "المظهر",
+    "light": "فاتح",
+    "dark": "داكن",
+    "system": "النظام"
+  },
+  "errors": {
+    "required": "هذا الحقل مطلوب",
+    "invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صالح",
+    "networkError": "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
+    "serverError": "خطأ في الخادم. يرجى المحاولة لاحقاً.",
+    "rateLimited": "طلبات كثيرة جداً. يرجى الانتظار."
+  },
+  "footer": {
+    "copyright": "© {year} مدقق البريد الإلكتروني. جميع الحقوق محفوظة.",
+    "privacy": "سياسة الخصوصية",
+    "terms": "شروط الخدمة",
+    "tagline": "أداة احترافية للتحقق من البريد الإلكتروني"
+  }
+}
