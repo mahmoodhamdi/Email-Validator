@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { EmailValidatorWrapper } from "@/components/email/EmailValidator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -18,18 +19,45 @@ function EmailValidatorFallback() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const t = await getTranslations("home");
+  const tFeatures = await getTranslations("features");
+
+  const features = [
+    {
+      title: tFeatures("syntaxCheck"),
+      description: tFeatures("syntaxCheckDesc"),
+    },
+    {
+      title: tFeatures("domainVerification"),
+      description: tFeatures("domainVerificationDesc"),
+    },
+    {
+      title: tFeatures("mxRecords"),
+      description: tFeatures("mxRecordsDesc"),
+    },
+    {
+      title: tFeatures("disposableDetection"),
+      description: tFeatures("disposableDetectionDesc"),
+    },
+    {
+      title: tFeatures("roleBasedCheck"),
+      description: tFeatures("roleBasedCheckDesc"),
+    },
+    {
+      title: tFeatures("typoSuggestions"),
+      description: tFeatures("typoSuggestionsDesc"),
+    },
+  ];
+
   return (
     <div className="container py-8 md:py-12">
       <div className="mx-auto max-w-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Email Validator
+            {t("title")}
           </h1>
-          <p className="text-lg text-muted-foreground">
-            Validate email addresses instantly with comprehensive checks including
-            syntax validation, domain verification, MX record lookup, and more.
-          </p>
+          <p className="text-lg text-muted-foreground">{t("subtitle")}</p>
         </div>
         <ErrorBoundary componentName="Email Validator">
           <Suspense fallback={<EmailValidatorFallback />}>
@@ -37,30 +65,13 @@ export default function Home() {
           </Suspense>
         </ErrorBoundary>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <FeatureCard
-            title="Syntax Check"
-            description="RFC 5322 compliant email format validation"
-          />
-          <FeatureCard
-            title="Domain Verification"
-            description="Check if the email domain exists and is valid"
-          />
-          <FeatureCard
-            title="MX Records"
-            description="Verify mail server existence via MX record lookup"
-          />
-          <FeatureCard
-            title="Disposable Detection"
-            description="Identify temporary and throwaway email addresses"
-          />
-          <FeatureCard
-            title="Role-Based Check"
-            description="Detect role-based emails like admin@ or support@"
-          />
-          <FeatureCard
-            title="Typo Suggestions"
-            description="Get correction suggestions for common domain typos"
-          />
+          {features.map((feature) => (
+            <FeatureCard
+              key={feature.title}
+              title={feature.title}
+              description={feature.description}
+            />
+          ))}
         </div>
       </div>
     </div>

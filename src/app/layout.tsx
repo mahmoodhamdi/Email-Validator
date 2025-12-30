@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Toaster } from "@/components/ui/toaster";
 import { PWAProvider } from "@/components/pwa/PWAProvider";
+import { LanguageProvider } from "@/components/providers/LanguageProvider";
+import { DirectionProvider } from "@/components/providers/DirectionProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin", "arabic"] });
 
 export const viewport: Viewport = {
   themeColor: [
@@ -53,13 +56,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <link
           rel="apple-touch-icon"
@@ -82,14 +88,18 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className={inter.className}>
-        <PWAProvider>
-          <div className="relative flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-          <Toaster />
-        </PWAProvider>
+        <LanguageProvider locale={locale} messages={messages}>
+          <DirectionProvider>
+            <PWAProvider>
+              <div className="relative flex min-h-screen flex-col">
+                <Header />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </div>
+              <Toaster />
+            </PWAProvider>
+          </DirectionProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

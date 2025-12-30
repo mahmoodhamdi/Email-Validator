@@ -2,31 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Mail, FileText, History, Code } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Mail, FileText, History, Code, BarChart3 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSwitcher } from "@/components/language/LanguageSwitcher";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Validate", icon: Mail },
-  { href: "/bulk", label: "Bulk", icon: FileText },
-  { href: "/history", label: "History", icon: History },
-  { href: "/api-docs", label: "API", icon: Code },
+  { href: "/", labelKey: "home", icon: Mail },
+  { href: "/bulk", labelKey: "bulk", icon: FileText },
+  { href: "/history", labelKey: "history", icon: History },
+  { href: "/analytics", labelKey: "analytics", icon: BarChart3 },
+  { href: "/api-docs", labelKey: "apiDocs", icon: Code },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
+  const tCommon = useTranslations("common");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center gap-2 me-6">
             <Mail className="h-6 w-6 text-primary" />
             <span className="hidden font-bold sm:inline-block">
-              Email Validator
+              {tCommon("appName")}
             </span>
           </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
+          <nav className="flex items-center gap-6 text-sm font-medium">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -41,13 +46,14 @@ export function Header() {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{item.label}</span>
+                  <span className="hidden sm:inline">{t(item.labelKey)}</span>
                 </Link>
               );
             })}
           </nav>
         </div>
-        <div className="flex flex-1 items-center justify-end space-x-2">
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
         </div>
       </div>
