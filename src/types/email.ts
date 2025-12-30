@@ -89,6 +89,35 @@ export interface AuthenticationCheck {
   message: string;
 }
 
+export interface ReputationCheck {
+  /** Whether the check was performed */
+  checked: boolean;
+  /** Reputation details (if checked) */
+  reputation?: {
+    score: number;
+    risk: 'low' | 'medium' | 'high' | 'critical';
+    age: {
+      ageInDays: number | null;
+      isNew: boolean;
+      isYoung: boolean;
+      message: string;
+    };
+    blocklists: {
+      listed: boolean;
+      listedCount: number;
+      message: string;
+    };
+    factors: Array<{
+      name: string;
+      impact: 'positive' | 'negative' | 'neutral';
+      description: string;
+    }>;
+    summary: string;
+  };
+  /** Human-readable message */
+  message: string;
+}
+
 export interface ValidationChecks {
   syntax: SyntaxCheck;
   domain: DomainCheck;
@@ -103,6 +132,8 @@ export interface ValidationChecks {
   smtp?: SMTPCheck;
   /** Optional email authentication (SPF/DMARC/DKIM) result */
   authentication?: AuthenticationCheck;
+  /** Optional domain reputation result */
+  reputation?: ReputationCheck;
 }
 
 export interface ValidationResult {

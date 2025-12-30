@@ -42,6 +42,7 @@ import { validateBlacklist } from './blacklist';
 import { validateCatchAll } from './catch-all';
 import { checkSMTP, type SMTPCheckResult } from './smtp';
 import { checkAuthentication, type AuthCheckResult } from './authentication';
+import { checkReputation, type ReputationCheckResult } from './reputation';
 
 /**
  * Result of bulk validation with early termination support.
@@ -68,6 +69,10 @@ export interface ValidationOptions {
   authCheck?: boolean;
   /** Authentication check timeout in ms (default: 10000) */
   authTimeout?: number;
+  /** Enable domain reputation check (default: false) */
+  reputationCheck?: boolean;
+  /** Reputation check timeout in ms (default: 15000) */
+  reputationTimeout?: number;
 }
 
 /**
@@ -92,9 +97,12 @@ export async function validateEmail(
   if (options.authCheck) {
     cacheKey += ':auth';
   }
+  if (options.reputationCheck) {
+    cacheKey += ':rep';
+  }
 
-  // Check result cache first (skip for SMTP/auth checks to ensure fresh results)
-  if (!options.smtpCheck && !options.authCheck) {
+  // Check result cache first (skip for SMTP/auth/reputation checks to ensure fresh results)
+  if (!options.smtpCheck && !options.authCheck && !options.reputationCheck) {
     const cached = resultCache.get(cacheKey);
     if (cached) {
       // Return cached result with updated timestamp
@@ -290,6 +298,67 @@ async function performValidation(
       }
     : undefined;
 
+  // Optional domain reputation check
+  let reputationResult: ReputationCheckResult | undefined;
+  if (options.reputationCheck && domainCheck.valid) {
+    reputationResult = await checkReputation(domain, {
+      enabled: true,
+      timeout: options.reputationTimeout || 15000,
+    });
+
+    // Adjust score based on reputation
+    if (reputationResult.checked && reputationResult.reputation) {
+      const repScore = reputationResult.reputation.score;
+      // Critical reputation = cap score and set high risk
+      if (repScore < 40) {
+        score = Math.min(score, 40);
+        risk = 'high';
+      } else if (repScore < 60) {
+        // Poor reputation = reduce score
+        score = Math.max(score - 15, 0);
+        if (risk === 'low') {
+          risk = 'medium';
+        }
+      } else if (repScore >= 80) {
+        // Good reputation = small bonus
+        score = Math.min(100, score + 3);
+      }
+    }
+  }
+
+  // Convert ReputationCheckResult to ReputationCheck for the response
+  const reputationCheck = reputationResult
+    ? {
+        checked: reputationResult.checked,
+        reputation: reputationResult.reputation
+          ? {
+              score: reputationResult.reputation.score,
+              risk: reputationResult.reputation.risk,
+              age: {
+                ageInDays: reputationResult.reputation.age.ageInDays,
+                isNew: reputationResult.reputation.age.isNew,
+                isYoung: reputationResult.reputation.age.isYoung,
+                message: reputationResult.reputation.age.message,
+              },
+              blocklists: {
+                listed: reputationResult.reputation.blocklists.listed,
+                listedCount: reputationResult.reputation.blocklists.lists.filter(
+                  (l) => l.listed
+                ).length,
+                message: reputationResult.reputation.blocklists.message,
+              },
+              factors: reputationResult.reputation.factors.map((f) => ({
+                name: f.name,
+                impact: f.impact,
+                description: f.description,
+              })),
+              summary: reputationResult.reputation.summary,
+            }
+          : undefined,
+        message: reputationResult.message,
+      }
+    : undefined;
+
   const result: ValidationResult = {
     email: email.trim(),
     isValid,
@@ -306,6 +375,7 @@ async function performValidation(
       catchAll: catchAllCheck,
       smtp: smtpResult,
       authentication: authenticationCheck,
+      reputation: reputationCheck,
     },
     deliverability,
     risk,
@@ -319,6 +389,9 @@ async function performValidation(
   }
   if (options.authCheck) {
     cacheKeySuffix += ':auth';
+  }
+  if (options.reputationCheck) {
+    cacheKeySuffix += ':rep';
   }
   resultCache.set(cacheKeySuffix, result);
 

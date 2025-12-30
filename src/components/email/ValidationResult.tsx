@@ -20,6 +20,10 @@ import {
   ShieldCheck,
   Key,
   FileKey,
+  Clock,
+  ShieldAlert,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import type { ValidationResult as ValidationResultType } from "@/types/email";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -425,6 +429,168 @@ export function ValidationResult({ result }: ValidationResultProps) {
 
                 <p className="text-xs text-muted-foreground mt-2">
                   {result.checks.authentication.authentication.summary}
+                </p>
+              </motion.div>
+            )}
+
+          {/* Domain Reputation Section */}
+          {result.checks.reputation?.checked &&
+            result.checks.reputation.reputation && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+                className="border-t pt-4 mt-2"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold flex items-center gap-2 text-sm">
+                    <Globe className="h-4 w-4" />
+                    Domain Reputation
+                  </h4>
+                  <Badge
+                    variant={
+                      result.checks.reputation.reputation.risk === "low"
+                        ? "success"
+                        : result.checks.reputation.reputation.risk === "medium"
+                        ? "warning"
+                        : "destructive"
+                    }
+                  >
+                    {result.checks.reputation.reputation.score}/100
+                  </Badge>
+                </div>
+
+                <div className="grid gap-2">
+                  {/* Reputation Score */}
+                  <div
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-lg",
+                      result.checks.reputation.reputation.score >= 80
+                        ? "bg-green-100 dark:bg-green-900"
+                        : result.checks.reputation.reputation.score >= 60
+                        ? "bg-yellow-100 dark:bg-yellow-900"
+                        : result.checks.reputation.reputation.score >= 40
+                        ? "bg-orange-100 dark:bg-orange-900"
+                        : "bg-red-100 dark:bg-red-900"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4" />
+                      <span className="text-sm font-medium">Risk Level</span>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-medium uppercase",
+                        result.checks.reputation.reputation.risk === "low"
+                          ? "text-green-600 dark:text-green-400"
+                          : result.checks.reputation.reputation.risk === "medium"
+                          ? "text-yellow-600 dark:text-yellow-400"
+                          : result.checks.reputation.reputation.risk === "high"
+                          ? "text-orange-600 dark:text-orange-400"
+                          : "text-red-600 dark:text-red-400"
+                      )}
+                    >
+                      {result.checks.reputation.reputation.risk}
+                    </span>
+                  </div>
+
+                  {/* Domain Age */}
+                  {result.checks.reputation.reputation.age.ageInDays !== null && (
+                    <div
+                      className={cn(
+                        "flex items-center justify-between p-2 rounded-lg",
+                        result.checks.reputation.reputation.age.isNew
+                          ? "bg-red-100 dark:bg-red-900"
+                          : result.checks.reputation.reputation.age.isYoung
+                          ? "bg-yellow-100 dark:bg-yellow-900"
+                          : "bg-green-100 dark:bg-green-900"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span className="text-sm font-medium">Domain Age</span>
+                      </div>
+                      <span
+                        className={cn(
+                          "text-sm",
+                          result.checks.reputation.reputation.age.isNew
+                            ? "text-red-600 dark:text-red-400"
+                            : result.checks.reputation.reputation.age.isYoung
+                            ? "text-yellow-600 dark:text-yellow-400"
+                            : "text-green-600 dark:text-green-400"
+                        )}
+                      >
+                        {result.checks.reputation.reputation.age.message}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Blocklist Status */}
+                  <div
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-lg",
+                      result.checks.reputation.reputation.blocklists.listed
+                        ? "bg-red-100 dark:bg-red-900"
+                        : "bg-green-100 dark:bg-green-900"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <span className="text-sm font-medium">Blocklists</span>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm",
+                        result.checks.reputation.reputation.blocklists.listed
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-green-600 dark:text-green-400"
+                      )}
+                    >
+                      {result.checks.reputation.reputation.blocklists.message}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Risk Factors */}
+                {result.checks.reputation.reputation.factors.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Risk Factors:
+                    </span>
+                    <div className="grid gap-1">
+                      {result.checks.reputation.reputation.factors.map(
+                        (factor, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "flex items-center gap-2 text-xs p-1 rounded",
+                              factor.impact === "positive"
+                                ? "text-green-600 dark:text-green-400"
+                                : factor.impact === "negative"
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-gray-600 dark:text-gray-400"
+                            )}
+                          >
+                            {factor.impact === "positive" ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : factor.impact === "negative" ? (
+                              <TrendingDown className="h-3 w-3" />
+                            ) : (
+                              <span className="w-3 text-center">•</span>
+                            )}
+                            <span className="font-medium">{factor.name}:</span>
+                            <span className="text-muted-foreground">
+                              {factor.description}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground mt-2">
+                  {result.checks.reputation.reputation.summary}
                 </p>
               </motion.div>
             )}
