@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Mail, FileText, History, Code, BarChart3 } from "lucide-react";
+import { Mail, FileText, History, Code, BarChart3, Wand2 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "@/components/language/LanguageSwitcher";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", labelKey: "home", icon: Mail },
   { href: "/bulk", labelKey: "bulk", icon: FileText },
+  { href: "/tools/clean", labelKey: "tools", icon: Wand2 },
   { href: "/history", labelKey: "history", icon: History },
   { href: "/analytics", labelKey: "analytics", icon: BarChart3 },
   { href: "/api-docs", labelKey: "apiDocs", icon: Code },

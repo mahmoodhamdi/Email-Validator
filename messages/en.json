@@ -21,6 +21,7 @@
   "nav": {
     "home": "Home",
     "bulk": "Bulk Validation",
+    "tools": "Tools",
     "history": "History",
     "apiDocs": "API Docs",
     "analytics": "Analytics",
