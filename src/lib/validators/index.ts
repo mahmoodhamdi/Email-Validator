@@ -43,6 +43,7 @@ import { validateCatchAll } from './catch-all';
 import { checkSMTP, type SMTPCheckResult } from './smtp';
 import { checkAuthentication, type AuthCheckResult } from './authentication';
 import { checkReputation, type ReputationCheckResult } from './reputation';
+import { checkGravatarProfile, type GravatarCheckResult } from './gravatar';
 
 /**
  * Result of bulk validation with early termination support.
@@ -73,6 +74,10 @@ export interface ValidationOptions {
   reputationCheck?: boolean;
   /** Reputation check timeout in ms (default: 15000) */
   reputationTimeout?: number;
+  /** Enable Gravatar profile check (default: false) */
+  gravatarCheck?: boolean;
+  /** Gravatar check timeout in ms (default: 5000) */
+  gravatarTimeout?: number;
 }
 
 /**
@@ -100,9 +105,12 @@ export async function validateEmail(
   if (options.reputationCheck) {
     cacheKey += ':rep';
   }
+  if (options.gravatarCheck) {
+    cacheKey += ':grav';
+  }
 
-  // Check result cache first (skip for SMTP/auth/reputation checks to ensure fresh results)
-  if (!options.smtpCheck && !options.authCheck && !options.reputationCheck) {
+  // Check result cache first (skip for SMTP/auth/reputation/gravatar checks to ensure fresh results)
+  if (!options.smtpCheck && !options.authCheck && !options.reputationCheck && !options.gravatarCheck) {
     const cached = resultCache.get(cacheKey);
     if (cached) {
       // Return cached result with updated timestamp
@@ -359,6 +367,32 @@ async function performValidation(
       }
     : undefined;
 
+  // Optional Gravatar profile check
+  let gravatarResult: GravatarCheckResult | undefined;
+  if (options.gravatarCheck) {
+    gravatarResult = await checkGravatarProfile(normalizedEmail, {
+      enabled: true,
+      timeout: options.gravatarTimeout || 5000,
+    });
+  }
+
+  // Convert GravatarCheckResult to GravatarCheck for the response
+  const gravatarCheck = gravatarResult
+    ? {
+        checked: gravatarResult.checked,
+        gravatar: gravatarResult.gravatar
+          ? {
+              exists: gravatarResult.gravatar.exists,
+              hash: gravatarResult.gravatar.hash,
+              url: gravatarResult.gravatar.url,
+              thumbnailUrl: gravatarResult.gravatar.thumbnailUrl,
+              profileUrl: gravatarResult.gravatar.profileUrl,
+            }
+          : undefined,
+        message: gravatarResult.message,
+      }
+    : undefined;
+
   const result: ValidationResult = {
     email: email.trim(),
     isValid,
@@ -376,6 +410,7 @@ async function performValidation(
       smtp: smtpResult,
       authentication: authenticationCheck,
       reputation: reputationCheck,
+      gravatar: gravatarCheck,
     },
     deliverability,
     risk,
@@ -392,6 +427,9 @@ async function performValidation(
   }
   if (options.reputationCheck) {
     cacheKeySuffix += ':rep';
+  }
+  if (options.gravatarCheck) {
+    cacheKeySuffix += ':grav';
   }
   resultCache.set(cacheKeySuffix, result);
 

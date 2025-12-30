@@ -118,6 +118,26 @@ export interface ReputationCheck {
   message: string;
 }
 
+export interface GravatarCheck {
+  /** Whether the check was performed */
+  checked: boolean;
+  /** Gravatar details (if checked) */
+  gravatar?: {
+    /** Whether Gravatar exists for this email */
+    exists: boolean;
+    /** MD5 hash of the email */
+    hash: string;
+    /** Full-size Gravatar URL */
+    url: string;
+    /** Thumbnail Gravatar URL */
+    thumbnailUrl: string;
+    /** Profile page URL (if exists) */
+    profileUrl?: string;
+  };
+  /** Human-readable message */
+  message: string;
+}
+
 export interface ValidationChecks {
   syntax: SyntaxCheck;
   domain: DomainCheck;
@@ -134,6 +154,8 @@ export interface ValidationChecks {
   authentication?: AuthenticationCheck;
   /** Optional domain reputation result */
   reputation?: ReputationCheck;
+  /** Optional Gravatar profile result */
+  gravatar?: GravatarCheck;
 }
 
 export interface ValidationResult {
