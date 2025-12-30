@@ -62,6 +62,33 @@ export interface SMTPCheck {
   responseTime?: number;
 }
 
+export interface AuthenticationCheck {
+  /** Whether the check was performed */
+  checked: boolean;
+  /** Authentication details (if checked) */
+  authentication?: {
+    spf: {
+      exists: boolean;
+      strength: 'strong' | 'moderate' | 'weak' | 'none';
+      message: string;
+    };
+    dmarc: {
+      exists: boolean;
+      strength: 'strong' | 'moderate' | 'weak' | 'none';
+      message: string;
+    };
+    dkim: {
+      found: boolean;
+      recordCount: number;
+      message: string;
+    };
+    score: number;
+    summary: string;
+  };
+  /** Human-readable message */
+  message: string;
+}
+
 export interface ValidationChecks {
   syntax: SyntaxCheck;
   domain: DomainCheck;
@@ -74,6 +101,8 @@ export interface ValidationChecks {
   catchAll: CatchAllCheck;
   /** Optional SMTP verification result */
   smtp?: SMTPCheck;
+  /** Optional email authentication (SPF/DMARC/DKIM) result */
+  authentication?: AuthenticationCheck;
 }
 
 export interface ValidationResult {

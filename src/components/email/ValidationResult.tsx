@@ -17,6 +17,9 @@ import {
   Shield,
   Inbox,
   MailCheck,
+  ShieldCheck,
+  Key,
+  FileKey,
 } from "lucide-react";
 import type { ValidationResult as ValidationResultType } from "@/types/email";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -171,6 +174,33 @@ export function ValidationResult({ result }: ValidationResultProps) {
     });
   }
 
+  // Helper function for authentication strength color
+  const getStrengthColor = (strength: string) => {
+    switch (strength) {
+      case "strong":
+        return "text-green-600 dark:text-green-400";
+      case "moderate":
+        return "text-yellow-600 dark:text-yellow-400";
+      case "weak":
+        return "text-orange-600 dark:text-orange-400";
+      default:
+        return "text-red-600 dark:text-red-400";
+    }
+  };
+
+  const getStrengthBg = (strength: string) => {
+    switch (strength) {
+      case "strong":
+        return "bg-green-100 dark:bg-green-900";
+      case "moderate":
+        return "bg-yellow-100 dark:bg-yellow-900";
+      case "weak":
+        return "bg-orange-100 dark:bg-orange-900";
+      default:
+        return "bg-red-100 dark:bg-red-900";
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -279,6 +309,125 @@ export function ValidationResult({ result }: ValidationResultProps) {
               </span>
             </div>
           )}
+
+          {/* Email Authentication Section */}
+          {result.checks.authentication?.checked &&
+            result.checks.authentication.authentication && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                className="border-t pt-4 mt-2"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold flex items-center gap-2 text-sm">
+                    <ShieldCheck className="h-4 w-4" />
+                    Email Authentication
+                  </h4>
+                  <Badge
+                    variant={
+                      result.checks.authentication.authentication.score >= 80
+                        ? "success"
+                        : result.checks.authentication.authentication.score >= 60
+                        ? "warning"
+                        : "destructive"
+                    }
+                  >
+                    {result.checks.authentication.authentication.score}/100
+                  </Badge>
+                </div>
+
+                <div className="grid gap-2">
+                  {/* SPF Status */}
+                  <div
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-lg",
+                      getStrengthBg(
+                        result.checks.authentication.authentication.spf.strength
+                      )
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <span className="text-sm font-medium">SPF</span>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        getStrengthColor(
+                          result.checks.authentication.authentication.spf
+                            .strength
+                        )
+                      )}
+                    >
+                      {result.checks.authentication.authentication.spf.exists
+                        ? result.checks.authentication.authentication.spf.strength.toUpperCase()
+                        : "NOT FOUND"}
+                    </span>
+                  </div>
+
+                  {/* DMARC Status */}
+                  <div
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-lg",
+                      getStrengthBg(
+                        result.checks.authentication.authentication.dmarc
+                          .strength
+                      )
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileKey className="h-4 w-4" />
+                      <span className="text-sm font-medium">DMARC</span>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        getStrengthColor(
+                          result.checks.authentication.authentication.dmarc
+                            .strength
+                        )
+                      )}
+                    >
+                      {result.checks.authentication.authentication.dmarc.exists
+                        ? result.checks.authentication.authentication.dmarc.strength.toUpperCase()
+                        : "NOT FOUND"}
+                    </span>
+                  </div>
+
+                  {/* DKIM Status */}
+                  <div
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-lg",
+                      result.checks.authentication.authentication.dkim.found
+                        ? "bg-green-100 dark:bg-green-900"
+                        : "bg-yellow-100 dark:bg-yellow-900"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      <span className="text-sm font-medium">DKIM</span>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        result.checks.authentication.authentication.dkim.found
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-yellow-600 dark:text-yellow-400"
+                      )}
+                    >
+                      {result.checks.authentication.authentication.dkim.found
+                        ? `FOUND (${result.checks.authentication.authentication.dkim.recordCount})`
+                        : "NOT FOUND"}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground mt-2">
+                  {result.checks.authentication.authentication.summary}
+                </p>
+              </motion.div>
+            )}
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={handleCopy}>
