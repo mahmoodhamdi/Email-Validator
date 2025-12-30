@@ -24,6 +24,8 @@ import {
   ShieldAlert,
   TrendingUp,
   TrendingDown,
+  UserCircle2,
+  ExternalLink,
 } from "lucide-react";
 import type { ValidationResult as ValidationResultType } from "@/types/email";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -594,6 +596,79 @@ export function ValidationResult({ result }: ValidationResultProps) {
                 </p>
               </motion.div>
             )}
+
+          {/* Gravatar Profile Section */}
+          {result.checks.gravatar?.checked && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.35 }}
+              className="border-t pt-4 mt-2"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold flex items-center gap-2 text-sm">
+                  <UserCircle2 className="h-4 w-4" />
+                  Gravatar Profile
+                </h4>
+                <Badge
+                  variant={
+                    result.checks.gravatar.gravatar?.exists
+                      ? "success"
+                      : "secondary"
+                  }
+                >
+                  {result.checks.gravatar.gravatar?.exists
+                    ? "Found"
+                    : "Not Found"}
+                </Badge>
+              </div>
+
+              {result.checks.gravatar.gravatar?.exists ? (
+                <div className="flex items-start gap-4">
+                  {/* Gravatar Image */}
+                  <div className="flex-shrink-0">
+                    <img
+                      src={result.checks.gravatar.gravatar.thumbnailUrl}
+                      alt="Gravatar"
+                      className="w-16 h-16 rounded-full border-2 border-green-200 dark:border-green-800"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+
+                  {/* Gravatar Details */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-green-100 dark:bg-green-900">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <span className="text-sm text-green-700 dark:text-green-300">
+                        Gravatar profile exists for this email
+                      </span>
+                    </div>
+
+                    {result.checks.gravatar.gravatar.profileUrl && (
+                      <a
+                        href={result.checks.gravatar.gravatar.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        View Profile
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+                  <UserCircle2 className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {result.checks.gravatar.message}
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={handleCopy}>
