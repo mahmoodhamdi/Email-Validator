@@ -46,6 +46,10 @@ The core validation logic is in `src/lib/validators/`. The main orchestrator `in
 8. **Blacklist check** (`blacklist.ts`) - Known spam source checking
 9. **Catch-all detection** (`catch-all.ts`) - Domains that accept all emails
 10. **SMTP verification** (`smtp.ts`) - Optional mailbox existence check via SMTP
+11. **Authentication** (`authentication.ts`) - SPF/DMARC/DKIM record validation
+12. **Reputation** (`reputation.ts`) - Domain reputation scoring
+13. **Gravatar** (`gravatar.ts`) - Gravatar profile detection
+14. **Custom blacklist** (`custom-blacklist.ts`) - User-defined blacklist checking
 
 Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level. Async checks (domain, MX, blacklist) run in parallel for performance.
 
@@ -60,12 +64,11 @@ SMTP verification is optional (disabled by default) and can detect:
 - Catch-all servers (accepts all addresses)
 - Greylisting (temporary rejection)
 
-### Email Authentication (In Progress)
+### Email List Cleaning
 
-The `src/lib/auth/` module provides SPF/DMARC/DKIM record checking:
-- `spf.ts` - SPF record parsing and validation
-- `dmarc.ts` - DMARC policy checking
-- `types.ts` - Authentication result types
+The `src/lib/cleaning/` module provides email list management:
+- `cleaner.ts` - Deduplication, normalization, and merging of email lists
+- `types.ts` - Cleaning operation types and options
 
 ### Scoring System
 
@@ -89,10 +92,12 @@ Bulk validation pre-fetches unique domains to reduce redundant DNS queries and p
 ### Data Files
 
 Static validation data is in `src/lib/data/`:
-- `disposable-domains.ts` - Blocklist of temporary email domains (update with `npm run update:domains`)
+- `disposable-domains.ts` - Blocklist of temporary email domains
 - `free-providers.ts` - List of free email providers
 - `role-emails.ts` - Role-based email prefixes
 - `common-typos.ts` - Domain typo mappings
+
+To update disposable domains list from external sources: `npm run update:domains`
 
 ### State Management
 
@@ -102,9 +107,12 @@ Uses Zustand for state:
 
 ### API Routes
 
-- `POST /api/validate` - Single email validation (supports `smtpCheck` option)
+- `POST /api/validate` - Single email validation (supports `smtpCheck`, `authCheck`, `reputationCheck`, `gravatarCheck` options)
 - `POST /api/validate-bulk` - Batch validation (array of emails)
+- `GET /api/validate-bulk/jobs/[jobId]` - Get bulk validation job status
 - `GET /api/health` - Health check endpoint
+- `POST /api/webhooks` - Webhook management
+- `GET /api/google/contacts` - Fetch Google contacts (requires OAuth)
 
 ### Pages
 
@@ -112,6 +120,8 @@ Uses Zustand for state:
 - `/bulk` - Bulk validation with CSV/TXT upload and export
 - `/history` - Validation history from localStorage
 - `/api-docs` - API documentation (Swagger UI)
+- `/tools` - Email list cleaning tools
+- `/import` - Google Contacts import
 
 ### Key Types
 
@@ -135,6 +145,20 @@ The CLI implements its own lightweight validation logic (no dependency on web ap
 ## Path Alias
 
 Use `@/` to import from `src/`. Example: `import { validateEmail } from '@/lib/validators'`
+
+## Internationalization
+
+The app supports English and Arabic (with RTL). Translation files are in `src/messages/`. Uses `next-intl` for i18n.
+
+## Environment Variables
+
+For Google Contacts import, set in `.env.local`:
+```
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=http://localhost:3000
+```
 
 ## Docker
 

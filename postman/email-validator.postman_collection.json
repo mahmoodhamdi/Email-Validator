@@ -1,0 +1,451 @@
+{
+  "info": {
+    "_postman_id": "email-validator-api-collection",
+    "name": "Email Validator API",
+    "description": "Complete API collection for Email Validator service. Includes all endpoints for email validation, bulk validation, webhooks, and health checks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check API health status, cache statistics, and circuit breaker states."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"healthy\",\n  \"version\": \"1.0.0\",\n  \"timestamp\": \"2024-01-01T00:00:00.000Z\",\n  \"endpoints\": {\n    \"validate\": \"POST /api/validate\",\n    \"validateBulk\": \"POST /api/validate-bulk\",\n    \"health\": \"GET /api/health\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Validation",
+      "item": [
+        {
+          "name": "Validate Single Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Validate a single email address with comprehensive checks."
+          },
+          "response": [
+            {
+              "name": "Valid Email",
+              "originalRequest": {
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"test@gmail.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/validate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "validate"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"email\": \"test@gmail.com\",\n  \"isValid\": true,\n  \"score\": 85,\n  \"deliverability\": \"deliverable\",\n  \"risk\": \"low\",\n  \"checks\": {\n    \"syntax\": { \"valid\": true, \"message\": \"Email syntax is valid\" },\n    \"domain\": { \"valid\": true, \"exists\": true, \"message\": \"Domain is valid\" },\n    \"mx\": { \"valid\": true, \"records\": [\"alt1.gmail-smtp-in.l.google.com\"], \"message\": \"Found MX records\" },\n    \"disposable\": { \"isDisposable\": false, \"message\": \"Not a disposable email\" },\n    \"roleBased\": { \"isRoleBased\": false, \"role\": null },\n    \"freeProvider\": { \"isFree\": true, \"provider\": \"gmail.com\" },\n    \"typo\": { \"hasTypo\": false, \"suggestion\": null }\n  },\n  \"timestamp\": \"2024-01-01T00:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Validate with SMTP Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"smtpCheck\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Validate email with SMTP mailbox verification."
+          },
+          "response": []
+        },
+        {
+          "name": "Validate with All Checks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"smtpCheck\": true,\n  \"authCheck\": true,\n  \"reputationCheck\": true,\n  \"gravatarCheck\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Validate email with all optional checks enabled (SMTP, Authentication, Reputation, Gravatar)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Validation API Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate"]
+            },
+            "description": "Get information about the validation API endpoint."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bulk Validation",
+      "item": [
+        {
+          "name": "Validate Multiple Emails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": [\n    \"test1@gmail.com\",\n    \"test2@yahoo.com\",\n    \"invalid-email\",\n    \"test3@outlook.com\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/validate-bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate-bulk"]
+            },
+            "description": "Validate multiple email addresses in a single request. Supports up to 1000 emails."
+          },
+          "response": [
+            {
+              "name": "Bulk Validation Success",
+              "originalRequest": {
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"emails\": [\"test1@gmail.com\", \"test2@yahoo.com\"]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/validate-bulk",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "validate-bulk"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"results\": [\n    { \"email\": \"test1@gmail.com\", \"isValid\": true, \"score\": 85 },\n    { \"email\": \"test2@yahoo.com\", \"isValid\": true, \"score\": 80 }\n  ],\n  \"metadata\": {\n    \"total\": 2,\n    \"completed\": 2,\n    \"duplicatesRemoved\": 0,\n    \"invalidRemoved\": 0,\n    \"timedOut\": false,\n    \"processingTimeMs\": 1234\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Validate with Streaming (NDJSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/x-ndjson"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": [\n    \"email1@example.com\",\n    \"email2@example.com\",\n    \"email3@example.com\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/validate-bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate-bulk"]
+            },
+            "description": "Validate emails with streaming response. Results are returned as newline-delimited JSON for batches over 100 emails."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Bulk API Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/validate-bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate-bulk"]
+            },
+            "description": "Get information about the bulk validation API endpoint."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/validate-bulk/jobs/:jobId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "validate-bulk", "jobs", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-id-here"
+                }
+              ]
+            },
+            "description": "Get the status of a background bulk validation job. Jobs are created for batches over 500 emails."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Create Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://your-webhook-endpoint.com/callback\",\n  \"events\": [\n    \"validation.complete\",\n    \"validation.failed\",\n    \"bulk.complete\"\n  ],\n  \"description\": \"My validation webhook\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks"]
+            },
+            "description": "Create a new webhook to receive validation event notifications."
+          },
+          "response": [
+            {
+              "name": "Webhook Created",
+              "originalRequest": {
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"url\": \"https://example.com/webhook\",\n  \"events\": [\"validation.complete\"]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/webhooks",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "webhooks"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"message\": \"Webhook created successfully\",\n  \"webhook\": {\n    \"id\": \"wh_123456789\",\n    \"url\": \"https://example.com/webhook\",\n    \"events\": [\"validation.complete\"],\n    \"secret\": \"whsec_abc123...\",\n    \"isActive\": true,\n    \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n  },\n  \"note\": \"Store the secret securely - it will not be shown again\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Webhook Documentation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks"]
+            },
+            "description": "Get webhook API documentation including available events and payload formats."
+          },
+          "response": []
+        },
+        {
+          "name": "Test Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"webhookId\": \"wh_123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "test"]
+            },
+            "description": "Send a test event to a webhook endpoint to verify it's working correctly."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Google Integration",
+      "item": [
+        {
+          "name": "Get Google Contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/google/contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "google", "contacts"]
+            },
+            "description": "Fetch contacts from Google. Requires Google OAuth authentication."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/google/contacts",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "google", "contacts"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"contacts\": [\n    {\n      \"id\": \"contact-id\",\n      \"name\": \"John Doe\",\n      \"email\": \"john@example.com\"\n    }\n  ],\n  \"count\": 1\n}"
+            },
+            {
+              "name": "Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/google/contacts",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "google", "contacts"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Not authenticated\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Add timestamp to requests for debugging",
+          "pm.request.headers.add({",
+          "    key: 'X-Request-Time',",
+          "    value: new Date().toISOString()",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Common test: Response time check",
+          "pm.test('Response time is less than 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "// Common test: Valid JSON response",
+          "pm.test('Response is valid JSON', function () {",
+          "    pm.response.to.be.json;",
+          "});"
+        ]
+      }
+    }
+  ]
+}

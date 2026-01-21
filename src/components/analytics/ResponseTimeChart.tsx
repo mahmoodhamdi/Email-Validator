@@ -33,7 +33,7 @@ export function ResponseTimeChart() {
               />
               <YAxis tick={{ fontSize: 12 }} unit="ms" />
               <Tooltip
-                formatter={(value: number) => [`${value}ms`, 'Avg Response Time']}
+                formatter={(value) => [`${value ?? 0}ms`, 'Avg Response Time']}
               />
               <Area
                 type="monotone"
