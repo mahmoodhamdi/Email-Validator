@@ -19,11 +19,16 @@
     "update:domains": "npx ts-node scripts/update-disposable-domains.ts",
     "docker:build": "docker build -t email-validator .",
     "docker:run": "docker run -p 3000:3000 email-validator",
-    "docker:dev": "docker-compose --profile dev up email-validator-dev",
-    "docker:prod": "docker-compose up -d email-validator",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up",
+    "docker:dev:build": "docker-compose -f docker-compose.dev.yml up --build",
+    "docker:prod": "docker-compose up -d",
+    "docker:prod:build": "docker-compose up -d --build",
     "docker:stop": "docker-compose down",
+    "docker:stop:dev": "docker-compose -f docker-compose.dev.yml down",
     "docker:logs": "docker-compose logs -f",
-    "docker:clean": "docker system prune -f && docker volume prune -f"
+    "docker:logs:app": "docker-compose logs -f app",
+    "docker:clean": "docker system prune -af && docker volume prune -f",
+    "docker:restart": "docker-compose restart app"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
