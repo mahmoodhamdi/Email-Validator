@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  email-validator:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
@@ -11,28 +11,40 @@ services:
     environment:
       - NODE_ENV=production
       - API_KEY_REQUIRED=false
+      - REDIS_URL=redis://redis:6379
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 40s
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - email-validator-network
 
-  # Development service with hot reload
-  email-validator-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: email-validator-dev
+  redis:
+    image: redis:7-alpine
+    container_name: email-validator-redis
     ports:
-      - "3000:3000"
+      - "6379:6379"
     volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
-    environment:
-      - NODE_ENV=development
-      - WATCHPACK_POLLING=true
-    profiles:
-      - dev
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - email-validator-network
+
+networks:
+  email-validator-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local

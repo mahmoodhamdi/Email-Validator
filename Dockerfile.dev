@@ -17,5 +17,9 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
+# Enable hot reload polling for Docker volumes
+ENV WATCHPACK_POLLING=true
+ENV CHOKIDAR_USEPOLLING=true
+
 # Start development server
 CMD ["npm", "run", "dev"]

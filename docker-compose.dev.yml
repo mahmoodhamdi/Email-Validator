@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: email-validator-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    restart: unless-stopped
+    networks:
+      - email-validator-dev-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: email-validator-redis-dev
+    ports:
+      - "6379:6379"
+    networks:
+      - email-validator-dev-network
+
+networks:
+  email-validator-dev-network:
+    driver: bridge
