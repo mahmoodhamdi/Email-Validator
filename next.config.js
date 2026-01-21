@@ -1,3 +1,6 @@
+const createNextIntlPlugin = require('next-intl/plugin');
+const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -270,4 +273,4 @@ const nextConfig = {
   poweredByHeader: false,
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = withNextIntl(withPWA(nextConfig));

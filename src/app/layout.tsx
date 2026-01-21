@@ -12,7 +12,7 @@ import { ShortcutsProvider } from "@/contexts/ShortcutsContext";
 import { GlobalShortcuts } from "@/components/shortcuts/GlobalShortcuts";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 
-const inter = Inter({ subsets: ["latin", "arabic"] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
   themeColor: [

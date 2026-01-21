@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Globe } from "lucide-react";
-import { type Locale, locales } from "@/i18n";
+import { type Locale, locales } from "@/lib/i18n-config";
 
 const languageNames: Record<Locale, string> = {
   en: "English",
