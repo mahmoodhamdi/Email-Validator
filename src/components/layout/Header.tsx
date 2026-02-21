@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Mail, FileText, History, Code, BarChart3, Wand2, Download } from "lucide-react";
+import { Mail, FileText, History, Code, BarChart3, Wand2, Download, Shield } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "@/components/language/LanguageSwitcher";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/history", labelKey: "history", icon: History },
   { href: "/analytics", labelKey: "analytics", icon: BarChart3 },
   { href: "/api-docs", labelKey: "apiDocs", icon: Code },
+  { href: "/admin", labelKey: "admin", icon: Shield },
 ];
 
 export function Header() {

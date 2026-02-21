@@ -67,12 +67,15 @@ describe('Docker Configuration', () => {
 
     test('docker-compose.yml has production service', () => {
       const content = fs.readFileSync(composePath, 'utf-8');
-      expect(content).toContain('email-validator:');
+      expect(content).toContain('app:');
+      expect(content).toContain('container_name: email-validator');
     });
 
-    test('docker-compose.yml has dev service', () => {
-      const content = fs.readFileSync(composePath, 'utf-8');
-      expect(content).toContain('email-validator-dev:');
+    test('docker-compose.dev.yml has dev service', () => {
+      const devComposePath = path.join(rootDir, 'docker-compose.dev.yml');
+      const content = fs.readFileSync(devComposePath, 'utf-8');
+      expect(content).toContain('app:');
+      expect(content).toContain('container_name: email-validator-dev');
     });
 
     test('docker-compose.yml has healthcheck', () => {
