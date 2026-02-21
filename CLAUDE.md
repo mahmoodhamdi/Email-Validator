@@ -18,17 +18,17 @@ npx tsc --noEmit     # Type check without emitting
 
 ```bash
 npm test                      # Run unit tests (Jest)
-npm test -- --watch           # Watch mode
-npm test -- --coverage        # With coverage report
+npm run test:watch            # Watch mode
+npm run test:coverage         # With coverage report
 npm test -- path/to/file      # Run single test file
 
 npx playwright install        # Install browsers (first time only)
-npm run test:e2e              # Run E2E tests (Playwright, requires build)
+npm run test:e2e              # Run E2E tests (Playwright, starts dev server automatically)
 npm run test:e2e:ui           # E2E with interactive UI
 npm run test:all              # Run both unit and E2E tests
 ```
 
-Unit tests are in `src/__tests__/` mirroring the source structure. E2E tests are in `e2e/`.
+Unit tests are in `src/__tests__/` mirroring the source structure. E2E tests are in `e2e/`. Coverage thresholds are 70% (branches, functions, lines, statements).
 
 ## Architecture Overview
 
@@ -51,6 +51,8 @@ The core validation logic is in `src/lib/validators/`. The main orchestrator `in
 13. **Gravatar** (`gravatar.ts`) - Gravatar profile detection
 14. **Custom blacklist** (`custom-blacklist.ts`) - User-defined blacklist checking
 
+Shared patterns are centralized in `patterns.ts` (RFC 5322 email regex, domain regex).
+
 Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level. Async checks (domain, MX, blacklist) run in parallel for performance.
 
 ### SMTP Verification
@@ -63,6 +65,16 @@ SMTP verification is optional (disabled by default) and can detect:
 - Non-existent mailboxes (confirmed undeliverable)
 - Catch-all servers (accepts all addresses)
 - Greylisting (temporary rejection)
+
+The SMTP client includes SSRF protection via MX hostname validation (rejects private IPs, localhost, internal domains).
+
+### Security
+
+Security utilities in `src/lib/security/`:
+- `request-validator.ts` - Request header/body validation, JSON parsing with size limits
+- `api-keys.ts` - API key management
+- `auth.ts` - Authentication middleware
+- `sanitize.ts` - Input sanitization (XSS prevention, email plausibility checks)
 
 ### Email List Cleaning
 
@@ -85,9 +97,9 @@ Risk thresholds: high < 50, medium 50-79, low ≥ 80
 
 - `src/lib/cache.ts` - LRU result cache for repeated validations
 - `src/lib/request-dedup.ts` - Deduplicates concurrent requests for same email
-- `src/lib/constants.ts` - Scoring weights, thresholds, timeouts, bulk config, and cache TTLs
+- `src/lib/constants.ts` - All configuration: scoring weights, thresholds, timeouts, rate limits, cache TTLs, bulk config
 
-Bulk validation pre-fetches unique domains to reduce redundant DNS queries and processes in configurable batches (default: 50 emails per batch).
+Bulk validation pre-fetches unique domains to reduce redundant DNS queries and processes in configurable batches (default: 50 emails per batch). Circuit breaker pattern protects against DNS service failures.
 
 ### Data Files
 
@@ -104,6 +116,12 @@ To update disposable domains list from external sources: `npm run update:domains
 Uses Zustand for state:
 - `src/stores/validation-store.ts` - Current validation state
 - `src/stores/history-store.ts` - Validation history (persisted to localStorage)
+- `src/stores/analytics-store.ts` - API usage analytics (persisted)
+- `src/stores/admin-store.ts` - Admin dashboard state (validation logs, config, security events)
+
+### Middleware
+
+`src/middleware.ts` runs only on `/api/:path*` routes. It handles CORS (configured via `ALLOWED_ORIGINS` env var) and sets security headers. In development, `localhost:3000` is allowed by default.
 
 ### API Routes
 
@@ -112,6 +130,8 @@ Uses Zustand for state:
 - `GET /api/validate-bulk/jobs/[jobId]` - Get bulk validation job status
 - `GET /api/health` - Health check endpoint
 - `POST /api/webhooks` - Webhook management
+- `POST /api/webhooks/test` - Test webhook delivery
+- `POST /api/csp-report` - CSP violation reporting
 - `GET /api/google/contacts` - Fetch Google contacts (requires OAuth)
 
 ### Pages
@@ -122,6 +142,7 @@ Uses Zustand for state:
 - `/api-docs` - API documentation (Swagger UI)
 - `/tools` - Email list cleaning tools
 - `/import` - Google Contacts import
+- `/admin` - Admin dashboard (system stats, validation logs, config, security events, reports)
 
 ### Key Types
 
@@ -150,6 +171,12 @@ Use `@/` to import from `src/`. Example: `import { validateEmail } from '@/lib/v
 
 The app supports English and Arabic (with RTL). Translation files are in `src/messages/`. Uses `next-intl` for i18n.
 
+## Coding Conventions
+
+- `console.log` is disallowed by ESLint. Use `console.error` or `console.warn` instead.
+- Unused function args must be prefixed with `_` (e.g., `_req`).
+- Strict equality (`===`) is enforced. Curly braces required for all control flow blocks.
+
 ## Environment Variables
 
 For Google Contacts import, set in `.env.local`:
@@ -160,10 +187,21 @@ NEXTAUTH_SECRET=...
 NEXTAUTH_URL=http://localhost:3000
 ```
 
+Optional configuration:
+```
+ALLOWED_ORIGINS=https://example.com,https://other.com  # CORS origins (comma-separated)
+SMTP_TIMEOUT=5000                                       # SMTP verification timeout
+REPUTATION_API_KEY=...                                  # Domain reputation API key
+CSP_REPORT_URI=/api/csp-report                         # CSP violation report endpoint
+```
+
 ## Docker
 
 ```bash
-docker build -t email-validator .           # Build image
-docker run -p 3000:3000 email-validator     # Run container
-docker-compose up -d                        # Run with compose
+npm run docker:build       # Build image
+npm run docker:run         # Run container
+npm run docker:prod        # Run with docker-compose (detached)
+npm run docker:dev         # Run development compose
+npm run docker:stop        # Stop containers
+npm run docker:logs        # View logs
 ```

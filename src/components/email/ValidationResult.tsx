@@ -255,7 +255,7 @@ export function ValidationResult({ result }: ValidationResultProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3">
+          <div className="grid gap-3" role="list" aria-label="Validation checks">
             {checks.map((check, index) => {
               const Icon = check.icon;
               const isNeutral = "neutral" in check && check.neutral;
@@ -266,6 +266,7 @@ export function ValidationResult({ result }: ValidationResultProps) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
+                  role="listitem"
                   className="flex items-start gap-3 p-2 rounded-lg bg-muted/50"
                 >
                   <div
@@ -279,11 +280,11 @@ export function ValidationResult({ result }: ValidationResultProps) {
                     )}
                   >
                     {isNeutral ? (
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-4 w-4" aria-hidden="true" />
                     ) : check.valid ? (
-                      <CheckCircle2 className="h-4 w-4" />
+                      <CheckCircle2 className="h-4 w-4" aria-label="Passed" />
                     ) : (
-                      <XCircle className="h-4 w-4" />
+                      <XCircle className="h-4 w-4" aria-label="Failed" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -306,7 +307,7 @@ export function ValidationResult({ result }: ValidationResultProps) {
 
           {result.checks.typo.hasTypo && result.checks.typo.suggestion && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" aria-label="Warning" />
               <span className="text-sm">
                 Did you mean{" "}
                 <strong className="text-amber-700 dark:text-amber-300">

@@ -87,6 +87,54 @@ class SMTPCache {
 const smtpCache = new SMTPCache();
 
 /**
+ * Validate MX hostname to prevent SSRF attacks
+ */
+function validateMxHostname(hostname: string): boolean {
+  // Reject empty hostnames
+  if (!hostname || hostname.trim().length === 0) {
+    return false;
+  }
+
+  // Reject IP addresses (IPv4 and IPv6)
+  const ipv4Regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+  const ipv6Regex = /^\[?[0-9a-fA-F:]+\]?$/;
+  if (ipv4Regex.test(hostname) || ipv6Regex.test(hostname)) {
+    return false;
+  }
+
+  // Reject private/internal hostnames
+  const blockedPatterns = [
+    /^localhost$/i,
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^0\./,
+    /^169\.254\./,
+    /\.local$/i,
+    /\.internal$/i,
+    /\.localhost$/i,
+  ];
+
+  if (blockedPatterns.some((pattern) => pattern.test(hostname))) {
+    return false;
+  }
+
+  // Validate hostname format (RFC 1123)
+  const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+  if (!hostnameRegex.test(hostname)) {
+    return false;
+  }
+
+  // Must have at least one dot (a real domain)
+  if (!hostname.includes('.')) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Verify if an email address exists via SMTP
  */
 export async function verifySMTP(
@@ -120,6 +168,9 @@ export async function verifySMTP(
   const hostsToTry = mxHosts.slice(0, 3);
 
   for (const mx of hostsToTry) {
+    if (!validateMxHostname(mx)) {
+      continue;
+    }
     for (const port of fullConfig.ports) {
       for (let attempt = 0; attempt <= fullConfig.retries; attempt++) {
         try {
