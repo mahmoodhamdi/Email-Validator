@@ -67,6 +67,14 @@ const withPWA = require('next-pwa')({
       handler: 'NetworkOnly',
     },
     {
+      urlPattern: /\/api\/webhooks/i,
+      handler: 'NetworkOnly',
+    },
+    {
+      urlPattern: /\/api\/admin/i,
+      handler: 'NetworkOnly',
+    },
+    {
       urlPattern: /\/api\/.*/i,
       handler: 'NetworkFirst',
       options: {

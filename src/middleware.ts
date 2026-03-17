@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
+ * Generate a short unique request ID for audit trail correlation.
+ */
+function generateRequestId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${timestamp}-${random}`;
+}
+
+/**
  * CORS configuration loaded from environment.
  */
 interface CorsConfig {
@@ -83,7 +92,7 @@ function setCorsHeaders(
   // Exposed headers (headers the client can access)
   response.headers.set(
     'Access-Control-Expose-Headers',
-    'X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After'
+    'X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After, X-Request-ID'
   );
 
   // Max age for preflight cache
@@ -120,11 +129,13 @@ export function middleware(request: NextRequest) {
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('X-Frame-Options', 'DENY');
 
+    // Add request ID for audit trail correlation
+    const requestId = request.headers.get('x-request-id') || generateRequestId();
+    response.headers.set('X-Request-ID', requestId);
+
     // Prevent caching of API responses with sensitive data
-    if (
-      request.nextUrl.pathname.startsWith('/api/validate') ||
-      request.nextUrl.pathname.startsWith('/api/csp-report')
-    ) {
+    const sensitivePaths = ['/api/validate', '/api/csp-report', '/api/webhooks', '/api/admin'];
+    if (sensitivePaths.some(p => request.nextUrl.pathname.startsWith(p))) {
       response.headers.set(
         'Cache-Control',
         'no-store, no-cache, must-revalidate, proxy-revalidate'

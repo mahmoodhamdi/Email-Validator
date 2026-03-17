@@ -11,8 +11,8 @@ export function sanitizeEmailInput(input: string): string {
     return '';
   }
 
-  // Trim and limit length
-  let sanitized = input.trim().slice(0, 254);
+  // Normalize Unicode to NFC form to prevent homograph attacks
+  let sanitized = input.normalize('NFC').trim().slice(0, 254);
 
   // Remove control characters except for basic whitespace
   sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');

@@ -18,9 +18,9 @@ describe('Docker Configuration', () => {
 
     test('Dockerfile has multi-stage build', () => {
       const content = fs.readFileSync(dockerfilePath, 'utf-8');
-      expect(content).toContain('FROM node:20-alpine AS deps');
-      expect(content).toContain('FROM node:20-alpine AS builder');
-      expect(content).toContain('FROM node:20-alpine AS runner');
+      expect(content).toContain('FROM node:20.18-alpine AS deps');
+      expect(content).toContain('FROM node:20.18-alpine AS builder');
+      expect(content).toContain('FROM node:20.18-alpine AS runner');
     });
 
     test('Dockerfile runs as non-root user', () => {
