@@ -94,11 +94,6 @@ export async function POST(request: NextRequest) {
       console.warn('[CSP Violation]', JSON.stringify(logEntry));
     }
 
-    // TODO: In production, you might want to:
-    // 1. Send to a logging service (e.g., Sentry, Datadog, CloudWatch)
-    // 2. Store in a database for analysis
-    // 3. Send alerts for suspicious patterns
-
     // Return 204 No Content (standard response for CSP reports)
     return new NextResponse(null, { status: 204 });
   } catch (error) {

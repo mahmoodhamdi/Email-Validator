@@ -102,14 +102,16 @@ export function isTrustedIP(ip: string): boolean {
     }
   }
 
-  // Check for CIDR ranges (basic implementation)
+  // Check for CIDR ranges
+  // Note: Only /24 prefix length is supported. All other masks are
+  // treated as /24. Use exact IPs for /32 matching.
   for (const trustedIP of trustedIPs) {
     if (trustedIP.includes('/')) {
-      // Basic CIDR check for /24 networks
       const [network] = trustedIP.split('/');
       const networkParts = network.split('.');
       const ipParts = ip.split('.');
-      if (networkParts.slice(0, 3).join('.') === ipParts.slice(0, 3).join('.')) {
+      if (networkParts.length === 4 && ipParts.length === 4 &&
+          networkParts.slice(0, 3).join('.') === ipParts.slice(0, 3).join('.')) {
         return true;
       }
     }

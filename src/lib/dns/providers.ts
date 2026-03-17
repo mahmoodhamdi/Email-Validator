@@ -107,14 +107,7 @@ function recordProviderSuccess(providerName: string): void {
  * Build DNS query URL for a provider.
  */
 function buildQueryUrl(provider: DnsProvider, domain: string, type: string): string {
-  const encodedDomain = encodeURIComponent(domain);
-
-  if (provider.format === 'google') {
-    return `${provider.url}?name=${encodedDomain}&type=${type}`;
-  }
-
-  // DoH format (Cloudflare, Quad9)
-  return `${provider.url}?name=${encodedDomain}&type=${type}`;
+  return `${provider.url}?name=${encodeURIComponent(domain)}&type=${type}`;
 }
 
 /**
