@@ -49,6 +49,8 @@ import {
   type CustomBlacklistCheckResult,
   type Blacklist,
 } from './custom-blacklist';
+import { createFailedResult } from './result-factory';
+import { delay } from '@/lib/utils/index';
 
 /**
  * Result of bulk validation with early termination support.
@@ -88,6 +90,26 @@ export interface ValidationOptions {
 }
 
 /**
+ * Build a cache key for validation results based on email and options.
+ */
+function buildCacheKey(email: string, options: ValidationOptions): string {
+  let key = email.toLowerCase().trim();
+  if (options.smtpCheck) {
+    key += ':smtp';
+  }
+  if (options.authCheck) {
+    key += ':auth';
+  }
+  if (options.reputationCheck) {
+    key += ':rep';
+  }
+  if (options.gravatarCheck) {
+    key += ':grav';
+  }
+  return key;
+}
+
+/**
  * Validate a single email address.
  * Results are cached for improved performance on repeated validations.
  *
@@ -99,22 +121,7 @@ export async function validateEmail(
   email: string,
   options: ValidationOptions = {}
 ): Promise<ValidationResult> {
-  const normalizedEmail = email.toLowerCase().trim();
-
-  // Build cache key based on options
-  let cacheKey = normalizedEmail;
-  if (options.smtpCheck) {
-    cacheKey += ':smtp';
-  }
-  if (options.authCheck) {
-    cacheKey += ':auth';
-  }
-  if (options.reputationCheck) {
-    cacheKey += ':rep';
-  }
-  if (options.gravatarCheck) {
-    cacheKey += ':grav';
-  }
+  const cacheKey = buildCacheKey(email, options);
 
   // Check result cache first (skip for SMTP/auth/reputation/gravatar checks to ensure fresh results)
   if (!options.smtpCheck && !options.authCheck && !options.reputationCheck && !options.gravatarCheck) {
@@ -147,7 +154,7 @@ async function performValidation(
   const syntaxCheck = validateSyntax(email);
 
   if (!syntaxCheck.valid) {
-    const result = createInvalidResult(email, syntaxCheck.message, timestamp);
+    const result = createFailedResult(email, syntaxCheck.message, 'undeliverable');
     // Cache invalid results too (they won't change)
     resultCache.set(normalizedEmail, result);
     return result;
@@ -156,7 +163,7 @@ async function performValidation(
   // Parse email
   const parsed = parseEmail(email);
   if (!parsed) {
-    const result = createInvalidResult(email, 'Failed to parse email', timestamp);
+    const result = createFailedResult(email, 'Failed to parse email', 'undeliverable');
     resultCache.set(normalizedEmail, result);
     return result;
   }
@@ -454,53 +461,12 @@ async function performValidation(
     timestamp,
   };
 
-  // Cache the result with appropriate key based on options
-  // Note: Don't cache results with custom blacklists as they are user-specific
-  let cacheKeySuffix = normalizedEmail;
-  if (options.smtpCheck) {
-    cacheKeySuffix += ':smtp';
-  }
-  if (options.authCheck) {
-    cacheKeySuffix += ':auth';
-  }
-  if (options.reputationCheck) {
-    cacheKeySuffix += ':rep';
-  }
-  if (options.gravatarCheck) {
-    cacheKeySuffix += ':grav';
-  }
-  // Only cache if no custom blacklists (they're user-specific)
+  // Cache the result (skip for custom blacklists as they are user-specific)
   if (!options.customBlacklists || options.customBlacklists.length === 0) {
-    resultCache.set(cacheKeySuffix, result);
+    resultCache.set(buildCacheKey(email, options), result);
   }
 
   return result;
-}
-
-function createInvalidResult(
-  email: string,
-  message: string,
-  timestamp: string
-): ValidationResult {
-  return {
-    email: email.trim(),
-    isValid: false,
-    score: 0,
-    checks: {
-      syntax: { valid: false, message },
-      domain: { valid: false, exists: false, message: 'Skipped due to syntax error' },
-      mx: { valid: false, records: [], message: 'Skipped due to syntax error' },
-      disposable: { isDisposable: false, message: 'Skipped' },
-      roleBased: { isRoleBased: false, role: null },
-      freeProvider: { isFree: false, provider: null },
-      typo: { hasTypo: false, suggestion: null },
-      blacklisted: { isBlacklisted: false, lists: [] },
-      catchAll: { isCatchAll: false },
-    },
-    deliverability: 'undeliverable',
-    risk: 'high',
-    timestamp,
-  };
 }
 
 function determineDeliverability(
@@ -613,7 +579,7 @@ export async function validateEmailBulk(
           return await validateEmail(email);
         } catch {
           // If individual email validation fails, create a failed result
-          return createTimeoutResult(email);
+          return createFailedResult(email, 'Validation timed out');
         }
       })
     );
@@ -687,36 +653,5 @@ async function prefetchDomains(domains: string[]): Promise<void> {
   }
 }
 
-/**
- * Create a timeout result for an email that couldn't be validated.
- */
-function createTimeoutResult(email: string): ValidationResult {
-  return {
-    email: email.trim(),
-    isValid: false,
-    score: 0,
-    checks: {
-      syntax: { valid: false, message: 'Validation timed out' },
-      domain: { valid: false, exists: false, message: 'Skipped due to timeout' },
-      mx: { valid: false, records: [], message: 'Skipped due to timeout' },
-      disposable: { isDisposable: false, message: 'Skipped' },
-      roleBased: { isRoleBased: false, role: null },
-      freeProvider: { isFree: false, provider: null },
-      typo: { hasTypo: false, suggestion: null },
-      blacklisted: { isBlacklisted: false, lists: [] },
-      catchAll: { isCatchAll: false },
-    },
-    deliverability: 'unknown',
-    risk: 'high',
-    timestamp: new Date().toISOString(),
-  };
-}
-
-/**
- * Helper function to create a delay.
- */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export { parseEmail } from './syntax';
+export { createFailedResult } from './result-factory';

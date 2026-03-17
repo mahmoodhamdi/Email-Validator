@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateEmail, validateEmailBulk } from '@/lib/validators';
+import { validateEmail, validateEmailBulk, createFailedResult } from '@/lib/validators';
 import { RATE_LIMITS, VALIDATION_TIMEOUTS, BULK_CONFIG } from '@/lib/constants';
+import { delay } from '@/lib/utils/index';
 import {
   checkRateLimit,
   getClientIdentifier,
@@ -227,7 +228,7 @@ function createStreamingResponse(
               try {
                 return await validateEmail(email);
               } catch {
-                return createErrorResult(email);
+                return createFailedResult(email, 'Validation error');
               }
             })
           );
@@ -286,34 +287,3 @@ function createStreamingResponse(
   });
 }
 
-/**
- * Create an error result for a failed email validation.
- */
-function createErrorResult(email: string): import('@/types/email').ValidationResult {
-  return {
-    email: email.trim(),
-    isValid: false,
-    score: 0,
-    checks: {
-      syntax: { valid: false, message: 'Validation error' },
-      domain: { valid: false, exists: false, message: 'Skipped' },
-      mx: { valid: false, records: [], message: 'Skipped' },
-      disposable: { isDisposable: false, message: 'Skipped' },
-      roleBased: { isRoleBased: false, role: null },
-      freeProvider: { isFree: false, provider: null },
-      typo: { hasTypo: false, suggestion: null },
-      blacklisted: { isBlacklisted: false, lists: [] },
-      catchAll: { isCatchAll: false },
-    },
-    deliverability: 'unknown',
-    risk: 'high',
-    timestamp: new Date().toISOString(),
-  };
-}
-
-/**
- * Helper function to create a delay.
- */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

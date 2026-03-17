@@ -4,8 +4,9 @@
  */
 
 import type { ValidationResult } from '@/types/email';
-import { validateEmail } from './validators';
+import { validateEmail, createFailedResult } from './validators';
 import { BULK_CONFIG, VALIDATION_TIMEOUTS } from './constants';
+import { delay } from './utils/index';
 
 /**
  * Status of a bulk validation job.
@@ -125,7 +126,8 @@ async function processBulkJob(jobId: string, emails: string[]): Promise<void> {
           try {
             return await validateEmail(email);
           } catch (error) {
-            return createErrorResult(email, error);
+            const msg = error instanceof Error ? error.message : 'Validation failed';
+            return createFailedResult(email, msg);
           }
         })
       );
@@ -156,33 +158,6 @@ async function processBulkJob(jobId: string, emails: string[]): Promise<void> {
     job.completedAt = new Date().toISOString();
     job.processingTimeMs = Date.now() - startTime;
   }
-}
-
-/**
- * Create an error result for a failed email validation.
- */
-function createErrorResult(email: string, error: unknown): ValidationResult {
-  const message = error instanceof Error ? error.message : 'Validation failed';
-
-  return {
-    email: email.trim(),
-    isValid: false,
-    score: 0,
-    checks: {
-      syntax: { valid: false, message },
-      domain: { valid: false, exists: false, message: 'Skipped' },
-      mx: { valid: false, records: [], message: 'Skipped' },
-      disposable: { isDisposable: false, message: 'Skipped' },
-      roleBased: { isRoleBased: false, role: null },
-      freeProvider: { isFree: false, provider: null },
-      typo: { hasTypo: false, suggestion: null },
-      blacklisted: { isBlacklisted: false, lists: [] },
-      catchAll: { isCatchAll: false },
-    },
-    deliverability: 'unknown',
-    risk: 'high',
-    timestamp: new Date().toISOString(),
-  };
 }
 
 /**
@@ -278,13 +253,6 @@ export function cleanupOldJobs(): number {
   }
 
   return cleaned;
-}
-
-/**
- * Helper function to create a delay.
- */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Start periodic cleanup (only on server)
