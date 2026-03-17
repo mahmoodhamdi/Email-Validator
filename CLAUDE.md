@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm run dev          # Start development server (port 3000)
-npm run build        # Production build
+npm run build        # Production build (standalone output for Docker)
 npm run lint         # Run ESLint
 npm run lint:strict  # ESLint with zero warnings allowed
 npm run format       # Format code with Prettier
@@ -28,180 +28,186 @@ npm run test:e2e:ui           # E2E with interactive UI
 npm run test:all              # Run both unit and E2E tests
 ```
 
-Unit tests are in `src/__tests__/` mirroring the source structure. E2E tests are in `e2e/`. Coverage thresholds are 70% (branches, functions, lines, statements).
+Unit tests are in `src/__tests__/` mirroring the source structure. E2E tests are in `e2e/`. Coverage thresholds are 70% (branches, functions, lines, statements). Coverage excludes `src/components/ui/**` (shadcn/ui), `page.tsx` files, `layout.tsx`, and `middleware.ts`.
 
 ## Architecture Overview
 
+**Stack:** Next.js 14, React 18, TypeScript (strict), Tailwind CSS 3, Zustand, Zod, next-intl, next-pwa.
+
 ### Validation Pipeline
 
-The core validation logic is in `src/lib/validators/`. The main orchestrator `index.ts` runs a multi-step validation pipeline:
+The core validation logic is in `src/lib/validators/`. The main orchestrator `index.ts` runs a multi-step pipeline:
 
-1. **Syntax validation** (`syntax.ts`) - RFC 5322 regex, parses local part and domain
-2. **Domain validation** (`domain.ts`) - Checks domain exists via DNS
-3. **MX validation** (`mx.ts`) - MX record lookup for mail servers
-4. **Disposable detection** (`disposable.ts`) - Checks against 500+ temp email domains
-5. **Role-based detection** (`role-based.ts`) - Detects prefixes like admin@, support@
-6. **Typo suggestion** (`typo.ts`) - Maps common typos (gmial.com → gmail.com)
-7. **Free provider detection** (`free-provider.ts`) - Identifies Gmail, Yahoo, etc.
-8. **Blacklist check** (`blacklist.ts`) - Known spam source checking
-9. **Catch-all detection** (`catch-all.ts`) - Domains that accept all emails
-10. **SMTP verification** (`smtp.ts`) - Optional mailbox existence check via SMTP
-11. **Authentication** (`authentication.ts`) - SPF/DMARC/DKIM record validation
-12. **Reputation** (`reputation.ts`) - Domain reputation scoring
-13. **Gravatar** (`gravatar.ts`) - Gravatar profile detection
-14. **Custom blacklist** (`custom-blacklist.ts`) - User-defined blacklist checking
+1. **Cache check** — skipped if optional checks (smtp/auth/reputation/gravatar) are requested
+2. **Request deduplication** — concurrent calls for the same email share one promise (`src/lib/request-dedup.ts`)
+3. **Syntax** (`syntax.ts`) — synchronous, fail-fast if invalid
+4. **Parallel async:** `Promise.all([validateDomain, validateMx, validateBlacklist])`
+5. **Synchronous checks:** disposable, roleBased, typo, freeProvider, catchAll
+6. **Score calculation** (additive, 0–100)
+7. **Optional:** SMTP → Auth → Reputation → Gravatar → Custom Blacklist (sequential, each gated)
 
-Shared patterns are centralized in `patterns.ts` (RFC 5322 email regex, domain regex).
+**Non-obvious orchestrator behaviors:**
+- `isValid` requires `!typoCheck.hasTypo` — a domain typo makes the email "invalid" even if it would deliver
+- SMTP only runs when MX records exist (`mxCheck.valid && mxCheck.records.length > 0`)
+- SMTP `exists === false` caps score at 20 and forces `undeliverable`/`high` risk
+- Custom blacklist hit forces score to 0; results with custom blacklists are never cached
+- Auth bonus: +5 if auth score ≥ 80, −5 if auth score = 0
+- Reputation < 40 caps score at 40; < 60 deducts 15
 
-Each validator returns a typed check result. The orchestrator combines these into a `ValidationResult` with a score (0-100), deliverability status, and risk level. Async checks (domain, MX, blacklist) run in parallel for performance.
+Shared regex patterns are in `patterns.ts`. All configuration lives in `src/lib/constants.ts`.
 
-### SMTP Verification
+### DNS Resolution
 
-The SMTP client in `src/lib/smtp/` performs mailbox existence verification:
-- `client.ts` - SMTP connection and RCPT TO verification
-- `types.ts` - SMTPCheckResult type definitions
+DNS uses **DNS-over-HTTPS** (not Node's `dns` module). Three providers with automatic failover and circuit breaker: Google → Cloudflare → Quad9. CSP only allows `dns.google` from the browser — other DoH providers are server-side only.
 
-SMTP verification is optional (disabled by default) and can detect:
-- Non-existent mailboxes (confirmed undeliverable)
-- Catch-all servers (accepts all addresses)
-- Greylisting (temporary rejection)
-
-The SMTP client includes SSRF protection via MX hostname validation (rejects private IPs, localhost, internal domains).
-
-### Security
-
-Security utilities in `src/lib/security/`:
-- `request-validator.ts` - Request header/body validation, JSON parsing with size limits
-- `api-keys.ts` - API key management
-- `auth.ts` - Authentication middleware
-- `sanitize.ts` - Input sanitization (XSS prevention, email plausibility checks)
-
-### Email List Cleaning
-
-The `src/lib/cleaning/` module provides email list management:
-- `cleaner.ts` - Deduplication, normalization, and merging of email lists
-- `types.ts` - Cleaning operation types and options
+**`domain.ts` is format-only** — it validates domain syntax via regex but does NOT perform DNS A-record lookups. `domainCheck.exists` is always `true` for valid-format domains. Actual domain existence is confirmed by MX record lookup.
 
 ### Scoring System
 
-Score weights are defined in `src/lib/constants.ts`:
-- MX records: 25% (most critical for deliverability)
-- Syntax + Domain: 20% each (basic validity)
-- Disposable: 15% (abuse prevention)
-- Typo: 10% (user mistake detection)
-- Role-based + Blacklist: 5% each (quality indicators)
+Score weights defined in `src/lib/constants.ts` (total = 100):
 
-Risk thresholds: high < 50, medium 50-79, low ≥ 80
+| Check | Weight |
+|-------|--------|
+| MX records | 25 |
+| Syntax | 20 |
+| Domain | 20 |
+| Disposable | 15 |
+| Typo | 10 |
+| Role-based | 5 |
+| Blacklist | 5 |
 
-### Caching & Performance
+Risk thresholds: high < 50, medium 50–79, low ≥ 80.
 
-- `src/lib/cache.ts` - LRU result cache for repeated validations
-- `src/lib/request-dedup.ts` - Deduplicates concurrent requests for same email
-- `src/lib/constants.ts` - All configuration: scoring weights, thresholds, timeouts, rate limits, cache TTLs, bulk config
+### SMTP Verification
 
-Bulk validation pre-fetches unique domains to reduce redundant DNS queries and processes in configurable batches (default: 50 emails per batch). Circuit breaker pattern protects against DNS service failures.
+`src/lib/smtp/client.ts` uses raw TCP sockets (`net` module) for RCPT TO verification — **Node.js runtime only**, not Edge. Disabled by default. Includes SSRF protection (rejects private IPs, localhost, internal hostnames).
 
-### Data Files
+### Bulk Validation
 
-Static validation data is in `src/lib/data/`:
-- `disposable-domains.ts` - Blocklist of temporary email domains
-- `free-providers.ts` - List of free email providers
-- `role-emails.ts` - Role-based email prefixes
-- `common-typos.ts` - Domain typo mappings
+- Pre-fetches unique domains to warm MX/domain caches before processing
+- Processes in batches (default 50 emails, 50ms delay between batches)
+- Jobs > 500 emails use an **in-memory job queue** (`src/lib/bulk-jobs.ts`) — not Redis-backed, lost on restart
+- Max bulk size: 1000 emails. Bulk timeout: 55s (Vercel limit is 60s)
 
-To update disposable domains list from external sources: `npm run update:domains`
+### Caching
+
+All caches are in-memory LRU (`src/lib/cache.ts`):
+- Validation results: 5 min / 1000 entries
+- MX records: 5 min / 2000 entries
+- Domain validation: 10 min / 2000 entries
+- Catch-all: 1 hour / 500 entries
+- Blacklist: 30 min / 1000 entries
+- Negative DNS: 1 min / 500 entries
 
 ### State Management
 
-Uses Zustand for state:
-- `src/stores/validation-store.ts` - Current validation state
-- `src/stores/history-store.ts` - Validation history (persisted to localStorage)
-- `src/stores/analytics-store.ts` - API usage analytics (persisted)
-- `src/stores/admin-store.ts` - Admin dashboard state (validation logs, config, security events)
+Zustand stores in `src/stores/`:
+- `validation-store` — current validation state
+- `history-store` — validation history (persisted to localStorage)
+- `analytics-store` — API usage analytics (persisted to localStorage)
+- `admin-store` — admin dashboard state
+- `blacklist-store`, `webhook-store` — feature-specific state
 
 ### Middleware
 
-`src/middleware.ts` runs only on `/api/:path*` routes. It handles CORS (configured via `ALLOWED_ORIGINS` env var) and sets security headers. In development, `localhost:3000` is allowed by default.
+`src/middleware.ts` runs only on `/api/:path*`. Handles CORS and security headers. **In production with no `ALLOWED_ORIGINS` set, no CORS headers are sent** — external cross-origin requests will be blocked. `localhost:3000` is auto-allowed only in development.
 
 ### API Routes
 
-- `POST /api/validate` - Single email validation (supports `smtpCheck`, `authCheck`, `reputationCheck`, `gravatarCheck` options)
-- `POST /api/validate-bulk` - Batch validation (array of emails)
-- `GET /api/validate-bulk/jobs/[jobId]` - Get bulk validation job status
-- `GET /api/health` - Health check endpoint
-- `POST /api/webhooks` - Webhook management
-- `POST /api/webhooks/test` - Test webhook delivery
-- `POST /api/csp-report` - CSP violation reporting
-- `GET /api/google/contacts` - Fetch Google contacts (requires OAuth)
+- `POST /api/validate` — single email (options: `smtpCheck`, `authCheck`, `reputationCheck`, `gravatarCheck`)
+- `POST /api/validate-bulk` — batch validation (array of emails)
+- `GET /api/validate-bulk/jobs/[jobId]` — poll background job status
+- `GET /api/health` — health check
+- `POST /api/webhooks` — webhook management
+- `POST /api/webhooks/test` — test webhook delivery
+- `POST /api/csp-report` — CSP violation reporting
+- `GET /api/google/contacts` — Google contacts (requires OAuth)
 
-### Pages
+API routes have two-level validation: Zod schema (`parseSingleEmailRequest`) with XSS detection, then `sanitizeEmail()` before calling the validator.
 
-- `/` - Single email validation with real-time results
-- `/bulk` - Bulk validation with CSV/TXT upload and export
-- `/history` - Validation history from localStorage
-- `/api-docs` - API documentation (Swagger UI)
-- `/tools` - Email list cleaning tools
-- `/import` - Google Contacts import
-- `/admin` - Admin dashboard (system stats, validation logs, config, security events, reports)
+### Security
+
+`src/lib/security/`:
+- `request-validator.ts` — header/body validation, JSON size limits
+- `api-keys.ts` — API key management (parsed from `API_KEYS` env var, re-parsed every 60s)
+- `auth.ts` — authentication middleware (opt-in via `API_KEY_REQUIRED=true`; same-origin requests bypass)
+- `sanitize.ts` — XSS prevention, email plausibility checks
+
+Rate limiting: in-memory sliding window, 100 req/min (single), 10 req/min (bulk). **Not shared across instances.**
 
 ### Key Types
 
-All validation types are in `src/types/email.ts`:
-- `ValidationResult` - Complete validation response
-- `ValidationChecks` - All individual check results
-- `DeliverabilityStatus` - deliverable | risky | undeliverable | unknown
-- `RiskLevel` - low | medium | high
+All validation types in `src/types/email.ts`: `ValidationResult`, `ValidationChecks`, `DeliverabilityStatus` (deliverable | risky | undeliverable | unknown), `RiskLevel` (low | medium | high).
+
+### Data Files
+
+Static validation data in `src/lib/data/`: `disposable-domains.ts`, `free-providers.ts`, `role-emails.ts`, `common-typos.ts`. Update disposable list: `npm run update:domains`.
+
+## Pages
+
+- `/` — single email validation
+- `/bulk` — CSV/TXT upload with batch validation and export
+- `/history` — validation history (localStorage)
+- `/api-docs` — Swagger UI
+- `/tools` — email list cleaning
+- `/import` — Google Contacts import
+- `/admin` — admin dashboard (stats, logs, config, security events)
+- `/analytics` — API usage analytics
 
 ## CLI Tool
 
-A standalone CLI tool exists in `cli/` with its own package.json:
+Standalone CLI in `cli/` with its own `package.json` (no dependency on web app):
 ```bash
-cd cli
-npm install
-npm run build
-npm run dev -- <email>    # Test directly with ts-node
+cd cli && npm install && npm run dev -- <email>
 ```
-The CLI implements its own lightweight validation logic (no dependency on web app).
 
-## Path Alias
+## SDKs
 
-Use `@/` to import from `src/`. Example: `import { validateEmail } from '@/lib/validators'`
+- **Node.js SDK:** `sdk/nodejs/`
+- **Python SDK:** `sdk/python/` (sync + async)
 
 ## Internationalization
 
-The app supports English and Arabic (with RTL). Translation files are in `src/messages/`. Uses `next-intl` for i18n.
+English and Arabic (RTL) via `next-intl`. Translations in `src/messages/`. i18n config entry point is `src/i18n.ts`. Locale resolved server-side in root layout.
 
 ## Coding Conventions
 
-- `console.log` is disallowed by ESLint. Use `console.error` or `console.warn` instead.
-- Unused function args must be prefixed with `_` (e.g., `_req`).
-- Strict equality (`===`) is enforced. Curly braces required for all control flow blocks.
+- `console.log` is disallowed by ESLint — use `console.error` or `console.warn`
+- Unused function args must be prefixed with `_` (e.g., `_req`)
+- Strict equality (`===`) enforced; curly braces required for all control flow
+- `no-var` enforced
+- Path alias: `@/` maps to `src/`
+- `isolatedModules: true` — no `const enum` or cross-file namespace merging
 
 ## Environment Variables
 
-For Google Contacts import, set in `.env.local`:
+Copy `.env.example` to `.env.local`. Key variables:
+
 ```
-GOOGLE_CLIENT_ID=...
+ALLOWED_ORIGINS=https://example.com    # CORS (required in production, comma-separated)
+API_KEY_REQUIRED=false                 # Enable API key auth
+API_KEYS=key:name:perms:tier[:expiry]  # Semicolon-separated keys
+SMTP_TIMEOUT=5000                      # SMTP verification timeout
+REPUTATION_API_KEY=...                 # Domain reputation API
+GOOGLE_CLIENT_ID=...                   # Google Contacts OAuth
 GOOGLE_CLIENT_SECRET=...
 NEXTAUTH_SECRET=...
 NEXTAUTH_URL=http://localhost:3000
 ```
 
-Optional configuration:
-```
-ALLOWED_ORIGINS=https://example.com,https://other.com  # CORS origins (comma-separated)
-SMTP_TIMEOUT=5000                                       # SMTP verification timeout
-REPUTATION_API_KEY=...                                  # Domain reputation API key
-CSP_REPORT_URI=/api/csp-report                         # CSP violation report endpoint
-```
-
 ## Docker
 
 ```bash
-npm run docker:build       # Build image
-npm run docker:run         # Run container
-npm run docker:prod        # Run with docker-compose (detached)
-npm run docker:dev         # Run development compose
-npm run docker:stop        # Stop containers
-npm run docker:logs        # View logs
+npm run docker:build    # Build image
+npm run docker:run      # Run container on port 3000
+npm run docker:dev      # Development compose
+npm run docker:prod     # Production compose (detached)
+npm run docker:stop     # Stop containers
+npm run docker:logs     # View logs
 ```
+
+Published to GitHub Container Registry: `ghcr.io/mahmoodhamdi/email-validator:latest`.
+
+## PWA
+
+PWA is **disabled in development** — service worker only registers in production builds. `/api/validate` is `NetworkOnly` (never cached by service worker). Offline page at `/offline`.
