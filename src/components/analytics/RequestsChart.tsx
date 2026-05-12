@@ -20,7 +20,13 @@ interface RequestsChartProps {
 export function RequestsChart({ timeRange }: RequestsChartProps) {
   const { getHourlyStats, getDailyStats } = useAnalyticsStore();
 
-  const data = timeRange === 'hourly' ? getHourlyStats(24) : getDailyStats(30);
+  // recharts' generic ChartData type can only accept a single concrete row
+  // type per chart. We flatten the hourly/daily union to `any[]` for the
+  // recharts boundary; the rest of this file uses dataKey strings that
+  // already encode the right field per branch.
+  const data = (timeRange === 'hourly'
+    ? getHourlyStats(24)
+    : getDailyStats(30)) as unknown as Record<string, unknown>[];
 
   const formatXAxis = (value: string) => {
     if (timeRange === 'hourly') {

@@ -38,7 +38,7 @@ export default function NotFound() {
       <p className="mt-8 text-sm text-muted-foreground">
         If you believe this is an error, please{' '}
         <a
-          href="https://github.com/anthropics/claude-code/issues"
+          href="https://github.com/mahmoodhamdi/Email-Validator/issues"
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-foreground"
